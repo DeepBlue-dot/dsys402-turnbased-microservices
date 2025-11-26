@@ -88,7 +88,7 @@ class TicTacToeGame {
 
     // Update the board
     newState.board[position] = player;
-    
+
     // Add to move history
     newState.moveHistory.push({
       player,
@@ -111,6 +111,70 @@ class TicTacToeGame {
 
     newState.updatedAt = new Date();
     return newState;
+  }
+
+  processMove(gameState, moveData) {
+    const { player, position } = moveData;
+    // Validate input
+    if (typeof position !== 'number') {
+      return {
+        success: false,
+        error: 'Position must be a number',
+        statusCode: 400
+      };
+    }
+
+    if (!['X', 'O'].includes(player)) {
+      return {
+        success: false,
+        error: 'Player must be "X" or "O"',
+        statusCode: 400
+      };
+    }
+
+    // Validate the move using existing logic
+    const validation = this.isValidMove(gameState, position, player);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: validation.reason,
+        statusCode: 400
+      };
+    }
+
+    try {
+      // Execute the move
+      const updatedGame = this.makeMove(gameState, position, player);
+
+      return {
+        success: true,
+        data: updatedGame,
+        statusCode: 200
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        statusCode: 500
+      };
+    }
+
+  }
+
+  /**
+ * Get game summary for API responses
+ */
+  getGameSummary(gameState) {
+    return {
+      gameId: gameState.gameId,
+      players: gameState.players,
+      board: gameState.board,
+      currentPlayer: gameState.currentPlayer,
+      status: gameState.status,
+      winner: gameState.winner,
+      moveCount: gameState.moveHistory.length,
+      isGameOver: this.isGameOver(gameState)
+    };
   }
 
   /**
@@ -145,7 +209,7 @@ class TicTacToeGame {
   getGameStatus(gameState) {
     const winner = this.checkWinner(gameState.board);
     const isFull = this.isBoardFull(gameState.board);
-    
+
     let status = gameState.status;
     let winningPlayer = null;
 
@@ -187,8 +251,23 @@ class TicTacToeGame {
    * @returns {boolean}
    */
   isGameOver(gameState) {
-    return this.checkWinner(gameState.board) !== null || 
-           this.isBoardFull(gameState.board);
+    return this.checkWinner(gameState.board) !== null ||
+      this.isBoardFull(gameState.board);
+  }
+
+  /**
+ * Validate game exists and is accessible
+ */
+  validateGameAccess(game, gameId) {
+    if (!game) {
+      return {
+        valid: false,
+        error: `Game ${gameId} not found`,
+        statusCode: 404
+      };
+    }
+
+    return { valid: true };
   }
 
   /**
@@ -198,7 +277,7 @@ class TicTacToeGame {
    */
   getBoardVisualization(board) {
     const cells = board.map((cell, index) => cell || index.toString());
-    
+
     return `
  ${cells[0]} | ${cells[1]} | ${cells[2]}
 ----------- 
