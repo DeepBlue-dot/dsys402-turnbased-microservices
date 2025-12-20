@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "../../lib/api";
+import { api } from "../../lib/api";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
 
   useEffect(() => {
-    apiFetch("/users")
+    api.get("/users")
       .then(res => setUsers(res.data))
       .catch(console.error);
   }, []);

@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "../lib/api";
-import { logout as clearAuth } from "../lib/auth";
+import { api } from "@/services/api";
 
 interface User {
   id: string;
   username: string;
-  // add other user properties as needed
 }
 
 export function useAuth() {
@@ -15,15 +13,19 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   async function fetchUser() {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const res = await api.get("/me");
+      const res = await api.auth.me(token);
       setUser(res.data);
-    } catch (err: unknown) {
-      if (typeof err === "object" && err !== null && "message" in err && (err as { message?: string }).message === "UNAUTHORIZED") {
-        setUser(null); // user not logged in → OK
-      } else {
-        console.error(err);
-      }
+    } catch (err: any) {
+      console.error("Auth check failed:", err.message);
+      localStorage.removeItem("token");
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -34,7 +36,7 @@ export function useAuth() {
   }, []);
 
   function logout() {
-    clearAuth();
+    localStorage.removeItem("token");
     setUser(null);
   }
 
@@ -43,5 +45,6 @@ export function useAuth() {
     loading,
     isAuthenticated: !!user,
     logout,
+    refreshUser: fetchUser // Exposed so login/register can trigger this
   };
 }
