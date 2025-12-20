@@ -1,0 +1,30 @@
+openapi: 3.0.3
+info:
+  title: Event/Notification Service (WebSocket)
+  version: 1.0.0
+
+servers:
+  - url: ws://localhost:3004/ws
+
+paths: {}
+
+components:
+  schemas:
+    TurnCompletedEvent:
+      type: object
+      properties:
+        type: { type: string, example: "turn_completed" }
+        matchId: { type: string }
+        board:
+          type: array
+          items:
+            type: array
+            items: { type: string }
+        nextPlayer: { type: string }
+
+    GameOverEvent:
+      type: object
+      properties:
+        type: { type: string, example: "game_over" }
+        winner: { type: string }
+        matchId: { type: string }

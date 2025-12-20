@@ -1,0 +1,84 @@
+openapi: 3.0.3
+info:
+  title: Player Service API
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3001
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new player
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: Player registered
+        '400':
+          description: Username already taken
+
+  /auth/login:
+    post:
+      summary: Authenticate a player and return JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '401':
+          description: Invalid credentials
+
+  /players/me:
+    get:
+      summary: Get logged-in player profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Player profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  username: { type: string }
+                  wins: { type: integer }
+                  losses: { type: integer }
+        '401':
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

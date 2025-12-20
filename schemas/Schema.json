@@ -1,0 +1,106 @@
+{
+  "$id": "https://example.com/game-events.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Turn-Based Multiplayer Game - Event Schemas",
+  "type": "object",
+
+  "definitions": {
+    "PlayerInfo": {
+      "type": "object",
+      "properties": {
+        "playerId": { "type": "string" },
+        "username": { "type": "string" }
+      },
+      "required": ["playerId", "username"]
+    }
+  },
+
+  "properties": {
+    "match_created": {
+      "type": "object",
+      "title": "Match Created Event",
+      "properties": {
+        "eventType": { "const": "match_created" },
+        "matchId": { "type": "string" },
+        "players": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PlayerInfo" }
+        },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["eventType", "matchId", "players", "timestamp"]
+    },
+
+    "turn_submitted": {
+      "type": "object",
+      "title": "Turn Submitted Event",
+      "properties": {
+        "eventType": { "const": "turn_submitted" },
+        "matchId": { "type": "string" },
+        "playerId": { "type": "string" },
+        "turnNumber": { "type": "integer" },
+        "action": {
+          "type": "object",
+          "properties": {
+            "moveType": { "type": "string" },
+            "payload": { "type": "object" }
+          },
+          "required": ["moveType"]
+        },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "eventType",
+        "matchId",
+        "playerId",
+        "turnNumber",
+        "action",
+        "timestamp"
+      ]
+    },
+
+    "turn_completed": {
+      "type": "object",
+      "title": "Turn Completed Event",
+      "properties": {
+        "eventType": { "const": "turn_completed" },
+        "matchId": { "type": "string" },
+        "turnNumber": { "type": "integer" },
+        "result": {
+          "type": "object",
+          "properties": {
+            "stateChanges": { "type": "object" },
+            "nextPlayerId": { "type": "string" }
+          }
+        },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "eventType",
+        "matchId",
+        "turnNumber",
+        "result",
+        "timestamp"
+      ]
+    },
+
+    "game_over": {
+      "type": "object",
+      "title": "Game Over Event",
+      "properties": {
+        "eventType": { "const": "game_over" },
+        "matchId": { "type": "string" },
+        "winnerId": { "type": "string" },
+        "finalState": { "type": "object" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "eventType",
+        "matchId",
+        "winnerId",
+        "finalState",
+        "timestamp"
+      ]
+    }
+  }
+}

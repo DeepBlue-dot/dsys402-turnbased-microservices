@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "binary"
+
+}
+
+datasource db {
+  provider = "postgresql"
+  
+}
+model Player {
+  id   String   @id @default(uuid())
+  username   String   @unique
+  email      String   @unique
+  password   String
+
+  wins       Int      @default(0)
+  losses     Int      @default(0)
+  rating     Int      @default(1000)
+
+  status     PlayerStatus @default(OFFLINE)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sessions   Session[]
+}
+
+model Session {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+
+  playerId  String
+  player    Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+enum PlayerStatus {
+  ONLINE
+  OFFLINE
+  IN_GAME
+}
