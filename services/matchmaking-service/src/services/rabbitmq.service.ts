@@ -12,7 +12,7 @@ export const initRabbit = async () => {
       const connection = await amqp.connect(config.rabbitmqUrl);
       channel = await connection.createChannel();
 
-      await channel.assertQueue(config.matchCreatedQueue, { durable: true });
+      //await channel.assertQueue(config.matchCreatedQueue, { durable: true });
 
       console.log("[Matchmaking] RabbitMQ connected");
       break;
@@ -40,7 +40,7 @@ export const consume = async (
       channel.ack(msg);
     } catch (err) {
       console.error("[Matchmaking] Event handling failed", err);
-      channel.nack(msg, false, false); // dead-letter if needed
+      channel.nack(msg, false, false); 
     }
   });
 };

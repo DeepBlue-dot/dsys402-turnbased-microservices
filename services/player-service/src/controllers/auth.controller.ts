@@ -21,24 +21,20 @@ export const login = async (req: Request, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
   const token = req.headers.authorization?.replace("Bearer ", "") || "";
-  playerService.logout(token).then((r) => res.json(r));
+  playerService.logout().then((r) => res.json(r));
 };
 
-export const verify = async (req: Request, res: Response) => {
+export const refresh = async (req: Request, res: Response): Promise<void> => {
   try {
-    const header = req.headers.authorization;
-    if (!header) {
-      res.status(401).json({ valid: false });
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      res.status(401).json({ error: "No token provided" });
       return;
     }
-
-    const token = header.replace("Bearer ", "");
-    const result = await playerService.verifyToken(token);
-    res.json(result);
+    const token = authHeader.split(" ")[1];
+    const newToken = await playerService.refreshToken(token);
+    res.json({ token: newToken });
   } catch (err: any) {
-    res.status(401).json({ 
-      valid: false, 
-      error: err.message 
-    });
+    res.status(401).json({ error: err.message });
   }
-};
+}

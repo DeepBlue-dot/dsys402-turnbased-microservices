@@ -7,16 +7,13 @@ const required = (k: string) => {
 };
 
 export const config = {
-  port: Number(process.env.PORT) || 3001,
-
-  redisUrl: required("REDIS_URL"),
-  rabbitmqUrl: required("RABBITMQ_URL"),
-
   matchmakingQueue: "matchmaking:queue",
-  matchmakingLockPrefix: "matchmaking:player:",
-  
-  playerEventsQueue: "player_events", 
 
-  playerServiceUrl: required("PLAYER_SERVICE_URL"),
-  matchCreatedQueue: "match_created",
+  port: Number(process.env.PORT) || 3000,
+
+  redisUrl: process.env.REDIS_URL || required("REDIS_URL"),
+
+  rabbitmqUrl: process.env.RABBITMQ_URL || required("RABBITMQ_URL"),
+
+  jwtSecret: process.env.JWT_SECRET || required("JWT_SECRET"),
 };

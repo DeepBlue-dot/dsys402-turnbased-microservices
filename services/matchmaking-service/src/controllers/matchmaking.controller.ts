@@ -1,70 +1,43 @@
-import { Request, Response } from "express";
-import { verifyToken, canJoin } from "../services/player.service.js";
-import { joinMatchmaking, leaveQueue } from "../services/matchmaking.service.js";
+import { Response } from "express";
+import { AuthRequest } from "../types/types.js";
+import * as matchmakingService from "../services/matchmaking.service.js";
 
-export const join = async (req: Request, res: Response) => {
+/**
+ * POST /api/matchmaking/join
+ * Protected by authMiddleware
+ */
+export const join = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const token = req.headers.authorization?.replace("Bearer ", "");
-    if (!token) {
+    const userId = req.userId;
+
+    if (!userId) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
-    // 1️⃣ Verify token
-    const auth = await verifyToken(token);
-    if (!auth.valid) {
-      res.status(401).json(auth);
-      return;
-    }
-
-    const playerId = auth.user.id;
-
-    // 2️⃣ Eligibility check
-    const eligibility = await canJoin(playerId);
-    if (!eligibility.allowed) {
-      res.status(400).json(eligibility);
-      return;
-    }
-
-    // 3️⃣ Join matchmaking
-    const result = await joinMatchmaking(
-      playerId,
-      eligibility.player.rating
-    );
-
+    const result = await matchmakingService.joinMatchmaking(userId);
     res.json(result);
-  } catch (err) {
-    console.log(err)
-    res.status(500).json({ error: "Matchmaking failed" });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
   }
 };
 
-export const leave = async (req: Request, res: Response) => {
+/**
+ * POST /api/matchmaking/leave
+ * Protected by authMiddleware
+ */
+export const leave = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const token = req.headers.authorization?.replace("Bearer ", "");
-    if (!token) {
+    const userId = req.userId;
+
+    if (!userId) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
-    // 1️⃣ Verify token
-    const auth = await verifyToken(token);
-    if (!auth.valid) {
-      res.status(401).json(auth);
-      return;
-    }
-
-    const playerId = auth.user.id;
-
-    // 2️⃣ Leave matchmaking (idempotent)
-    await leaveQueue(playerId);
-
-    res.json({
-      success: true,
-      message: "Left matchmaking",
-    });
-  } catch (err) {
-    console.error("[Matchmaking] leave failed", err);
-    res.status(500).json({ error: "Failed to leave matchmaking" });
+    const result = await matchmakingService.leaveQueue(userId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
   }
 };

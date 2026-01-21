@@ -1,43 +1,49 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
-
 }
 
 datasource db {
   provider = "postgresql"
-  
 }
+
+// --- IDENTITY ---
 model Player {
-  id   String   @id @default(uuid())
-  username   String   @unique
-  email      String   @unique
-  password   String
-
-  wins       Int      @default(0)
-  losses     Int      @default(0)
-  rating     Int      @default(1000)
-
-  status     PlayerStatus @default(OFFLINE)
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  sessions   Session[]
-}
-
-model Session {
-  id        Int      @id @default(autoincrement())
-  token     String   @unique
-
-  playerId  String
-  player    Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile   PlayerProfile?
+  stats     PlayerStats?
 }
 
-enum PlayerStatus {
-  ONLINE
-  OFFLINE
-  IN_GAME
+model PlayerProfile {
+  id        String   @id @default(uuid())
+  playerId  String   @unique
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  username  String   @unique
+  avatarUrl String?
+  bio       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PlayerStats {
+  id        String   @id @default(uuid())
+  playerId  String   @unique
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  draws     Int      @default(0)
+  rating    Int      @default(1000) 
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
 }

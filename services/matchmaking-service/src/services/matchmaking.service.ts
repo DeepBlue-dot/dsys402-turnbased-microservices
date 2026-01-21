@@ -1,73 +1,41 @@
-import { redis } from "./redis.service.js";
-import { config } from "../config/env.js";
-import { publishMatchCreated } from "./rabbitmq.service.js";
-import { v4 as uuid } from "uuid";
+import { redis } from "../config/redis.js";
 
-const LOCK_TTL = 60; // seconds
-const RATING_WINDOW = 200;
+const QUEUE_KEY = "match:queue:ranked";
 
-export const joinMatchmaking = async (
-  playerId: string,
-  rating: number
-) => {
-  const lockKey = `${config.matchmakingLockPrefix}${playerId}`;
+export const joinMatchmaking = async (userId: string) => {
+  const presenceKey = `presence:${userId}`;
 
-  const locked = await redis.setnx(lockKey, "1");
-  if (!locked) {
-    return { joined: false, reason: "Already in matchmaking" };
+  const playerData = await redis.hgetall(presenceKey);
+
+  if (!playerData || Object.keys(playerData).length === 0) {
+    throw new Error("Player presence not found. Please ensure you are connected.");
   }
 
-  await redis.expire(lockKey, LOCK_TTL);
-
-  const min = rating - RATING_WINDOW;
-  const max = rating + RATING_WINDOW;
-
-  const candidates = await redis.zrangebyscore(
-    config.matchmakingQueue,
-    min,
-    max
-  );
-
-  if (candidates.length > 0) {
-    const opponentId = candidates[0]; // ✅ STRING
-
-    const tx = redis.multi();
-    tx.zrem(config.matchmakingQueue, opponentId);
-    tx.del(`${config.matchmakingLockPrefix}${opponentId}`);
-    tx.del(lockKey);
-    await tx.exec();
-
-    const match = {
-      event: "match_created",
-      matchId: uuid(),
-      players: [playerId, opponentId], // ✅ both strings
-      createdAt: Date.now(),
-    };
-
-    await publishMatchCreated(match);
-    return { matched: true, match };
+  if (playerData.status === "QUEUED") {
+    throw new Error("Already in queue");
   }
 
-  await redis.zadd(
-    config.matchmakingQueue,
-    rating,
-    playerId
-  );
+  if (playerData.status === "IN_GAME") {
+    throw new Error("Already in a match");
+  }
 
-  return { waiting: true };
+  const rating = parseInt(playerData.rating || "1000");
+
+  await redis.pipeline()
+    .hset(presenceKey, "status", "QUEUED")
+    .zadd(QUEUE_KEY, rating, userId)
+    .exec();
+
+  return { message: "Joined queue", rating };
 };
 
+export const leaveQueue = async (userId: string) => {
+  const presenceKey = `presence:${userId}`;
 
-export const leaveQueue = async (playerId: number) => {
-  const tx = redis.multi();
+  await redis.pipeline()
+    .zrem(QUEUE_KEY, userId)
+    .hset(presenceKey, "status", "IDLE")
+    .exec();
 
-  // Remove from matchmaking queue
-  tx.zrem(config.matchmakingQueue, playerId.toString());
-
-  // Remove matchmaking lock (if any)
-  tx.del(`${config.matchmakingLockPrefix}${playerId}`);
-
-  await tx.exec();
-
-  console.log(`[Matchmaking] Player ${playerId} left queue`);
+  return { message: "Left queue" };
 };

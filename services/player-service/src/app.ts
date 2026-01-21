@@ -1,8 +1,8 @@
 import express from "express";
 import cors from "cors";
 import router from "./routes/index.js";
-import { initRabbit, consumePlayerEvents } from "./services/rabbitmq.service.js";
-import { handlePlayerEvent } from "./consumers/playerEvents.consumer.js";
+import { initRabbit, consumeEvents } from "./services/rabbitmq.service.js";
+import { handleEvents } from "./consumers/Events.consumer.js";
 
 const app = express();
 
@@ -12,7 +12,7 @@ app.use("/api", router);
 
 export const startApp = async () => {
   await initRabbit();
-  await consumePlayerEvents(handlePlayerEvent);
+  await consumeEvents(handleEvents);
 
   console.log("[PlayerService] Event consumers started");
 };

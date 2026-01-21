@@ -32,7 +32,7 @@ export const initRabbit = async () => {
   }
 };
 
-export const consumePlayerEvents = async (
+export const consumeEvents = async (
   handler: (event: any) => Promise<void>
 ) => {
   const ch = assertChannel();
@@ -42,10 +42,8 @@ export const consumePlayerEvents = async (
   await ch.consume(config.playerEventsQueue, async (msg) => {
     if (!msg) return;
 
-    const event = JSON.parse(msg.content.toString());
-    console.log(`[GAME EVENT] ${config.playerEventsQueue} :`, event);
-
     try {
+      const event = JSON.parse(msg.content.toString());
       await handler(event);
       ch.ack(msg);
     } catch (err) {
