@@ -42,12 +42,10 @@ export const initRabbit = async () => {
   }
 };
 
-export const consumeEvents = async (handler: (event: any) => Promise<void>) => {
+export const consumeEvents = async (queue: string, handler: (event: any) => Promise<void>) => {
   const ch = assertChannel();
 
-  console.log(`[Matchmaking] Listening on ${config.matchmakingQueue}`);
-
-  await ch.consume(config.matchmakingQueue, async (msg) => {
+  await ch.consume(queue, async (msg) => {
     if (!msg) return;
 
     try {

@@ -46,14 +46,14 @@ export const initRabbit = async () => {
 };
 
 
-export const consumeEvents = async (
+export const consumeEvents = async (queue: string,
   handler: (event: any) => Promise<void>
 ) => {
   const ch = assertChannel();
 
   console.log(`[PlayerService] Listening on ${config.playerEventsQueue}`);
 
-  await ch.consume(config.playerEventsQueue, async (msg) => {
+  await ch.consume(queue, async (msg) => {
     if (!msg) return;
 
     try {

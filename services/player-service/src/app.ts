@@ -13,7 +13,7 @@ app.use("/", router);
 
 const startApp = async () => {
   await initRabbit();
-  await consumeEvents(handleEvents);
+  await consumeEvents(config.playerEventsQueue, handleEvents);
 
   app.listen(config.port, () => {
     console.log(`[PlayerService] HTTP running on port ${config.port}`);
