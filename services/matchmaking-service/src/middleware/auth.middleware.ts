@@ -1,8 +1,8 @@
 import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { AuthRequest, JwtPayload } from "../types/types.js";
+import { config } from "../config/env.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "secret";
 
 export const authMiddleware = (
   req: AuthRequest,
@@ -19,7 +19,7 @@ export const authMiddleware = (
 
     const token = header.split(" ")[1];
 
-    const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const payload = jwt.verify(token, config.jwtSecret) as JwtPayload;
     req.userId = payload.userId;
 
     next();

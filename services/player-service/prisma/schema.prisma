@@ -15,6 +15,8 @@ model Player {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  lastOnline DateTime? @default(now()) 
+
 
   profile   PlayerProfile?
   stats     PlayerStats?

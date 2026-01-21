@@ -24,9 +24,8 @@ export const config = {
   playerEventsQueue: "player.events.queue",
 
   playerRoutingKeys: [
-    "player.created",
-    "player.updated",
     "player.connected",
+    "player.disconnected",
     "player.heartbeat",
     "match.ended",
   ] as const,

@@ -1,4 +1,5 @@
 import { Request } from "express";
+import WebSocket from "ws";
 
 
 export interface JwtPayload {
@@ -10,6 +11,14 @@ export interface JwtPayload {
 export interface AuthRequest extends Request {
   userId?: string; 
 }
+
+
+export interface AuthenticatedSocket extends WebSocket {
+  userId?: string;
+  isAlive: boolean
+  wasKicked: boolean
+}
+
 
 
 export type PlayerDisconnectedData = {

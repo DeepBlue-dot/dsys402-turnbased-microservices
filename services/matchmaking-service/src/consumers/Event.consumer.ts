@@ -1,43 +1,23 @@
 import { redis } from "../config/redis.js";
+import { PlayerDisconnectedData, Event } from "../types/types.js";
 
-const RANKED_QUEUE_KEY = "match:queue:ranked";
-const JOIN_TIMES_KEY = "match:join_times";
-
-type PlayerDisconnectedEvent = {
-  type: "PLAYER_DISCONNECTED";
-  payload: {
-    userId: string;
-  };
+export const handleEvents = async (event: Event) => {
+  switch (event.type) {
+    case "player.disconnected":
+      await handlePlayerDisconnected(event.data as PlayerDisconnectedData);
+      break;
+  }
 };
 
-type MatchmakingEvent = PlayerDisconnectedEvent;
+export const handlePlayerDisconnected = async (payload: PlayerDisconnectedData) => {
+  const { userId } = payload;
+  console.log(`[Matchmaking] Cleaning up queue for ${userId}`);
 
+  const QUEUE_KEY = "match:queue:ranked";
+  const JOIN_TIMES_KEY = "match:join_times";
 
-export const handleIncomingEvents = async (event: MatchmakingEvent) => {
-  if (event.type !== "PLAYER_DISCONNECTED") return;
-
-  const { userId } = event.payload;
-
-  if (!userId) {
-    console.warn("[Matchmaking] PLAYER_DISCONNECTED missing userId");
-    return;
-  }
-
-  console.log(
-    `[Matchmaking] Janitor: cleaning up disconnected player ${userId}`
-  );
-
-  try {
-    const pipeline = redis.pipeline();
-
-    pipeline.zrem(RANKED_QUEUE_KEY, userId);
-    pipeline.hdel(JOIN_TIMES_KEY, userId);
-
-    await pipeline.exec();
-  } catch (err) {
-    console.error(
-      `[Matchmaking] Failed to clean up player ${userId}`,
-      err
-    );
-  }
+  await redis.pipeline()
+    .zrem(QUEUE_KEY, userId)
+    .hdel(JOIN_TIMES_KEY, userId)
+    .exec();
 };

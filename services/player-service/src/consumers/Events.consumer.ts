@@ -1,33 +1,25 @@
 import { prisma } from "../config/prisma.js";
 import { redis } from "../config/redis.js";
+import { publishEvent } from "../services/rabbitmq.service.js";
 
-const PRESENCE_TTL = 60;
+const ONLINE_SET_KEY = "online_players";
 
+// Types
 interface PlayerConnectedPayload {
   userId: string;
-  username: string;
-  rating: number;
 }
-
-interface PlayerHeartbeatPayload {
-  userId: string;
-}
-
 interface MatchEndedPayload {
   winnerId: string;
   loserId: string;
   isDraw: boolean;
 }
 
-interface Event<T = any> {
-  type: string;
-  payload: T;
-}
-
 const calculateElo = (winnerRating: number, loserRating: number) => {
   const K = 32;
-  const expectedWinner = 1 / (1 + Math.pow(10, (loserRating - winnerRating) / 400));
-  const expectedLoser = 1 / (1 + Math.pow(10, (winnerRating - loserRating) / 400));
+  const expectedWinner =
+    1 / (1 + Math.pow(10, (loserRating - winnerRating) / 400));
+  const expectedLoser =
+    1 / (1 + Math.pow(10, (winnerRating - loserRating) / 400));
 
   return {
     winnerNewRating: Math.round(winnerRating + K * (1 - expectedWinner)),
@@ -35,48 +27,114 @@ const calculateElo = (winnerRating: number, loserRating: number) => {
   };
 };
 
-export const handleEvents = async (event: Event) => {
+/**
+ * Main Event Discriminator
+ */
+export const handleEvents = async (event: { type: string; data: any, occurredAt:string }) => {
   switch (event.type) {
     case "player.connected":
-      await handlePlayerConnected(event.payload as PlayerConnectedPayload);
+      await handlePlayerConnected(event.data);
+      break;
+
+    case "player.disconnected":
+      await handlePlayerDisconnected(event.data);
       break;
 
     case "player.heartbeat":
-      await handlePlayerHeartbeat(event.payload as PlayerHeartbeatPayload);
+      await handlePlayerHeartbeat(event.data);
       break;
 
     case "match.ended":
-      await handleMatchEnded(event.payload as MatchEndedPayload);
+      await handleMatchEnded(event.data);
       break;
+
+    default:
+      console.warn(`[PlayerService] Unhandled event type: ${event.type}`);
   }
 };
 
-const handlePlayerConnected = async (payload: PlayerConnectedPayload) => {
-  const { userId, username, rating } = payload;
-  const key = `presence:${userId}`;
-
-  await redis.hset(key, {
-    userId,
-    username,
-    rating: rating.toString(),
-    status: "IDLE",
-    lastPulse: Date.now().toString(),
-  });
-
-  await redis.expire(key, PRESENCE_TTL);
-  console.log(`[Presence] Player ${username} online (TTL 60s)`);
+const handlePlayerHeartbeat = async (payload: { userId: string }) => {
+  try {
+    const isOnline = await redis.sismember(ONLINE_SET_KEY, payload.userId);
+    if (isOnline) {
+      await redis.hset(`presence:${payload.userId}`, "missedHeartbeats", "0");
+    }
+  } catch (error) {
+    console.error(`[Presence] Heartbeat error for ${payload.userId}:`, error);
+  }
 };
 
-const handlePlayerHeartbeat = async (payload: PlayerHeartbeatPayload) => {
+/**
+ * Handle Connection: Fetch from DB and Prime Redis
+ */
+const handlePlayerConnected = async (payload: PlayerConnectedPayload) => {
   const { userId } = payload;
   const key = `presence:${userId}`;
 
-  if (await redis.exists(key)) {
-    await redis.hset(key, "lastPulse", Date.now().toString());
-    await redis.expire(key, PRESENCE_TTL);
+  try {
+    const existingStatus = await redis.hget(key, "status");
+
+    const player = await prisma.player.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        profile: { select: { username: true } },
+        stats: { select: { rating: true } },
+      },
+    });
+
+    if (!player) return;
+
+    const pipeline = redis.pipeline();
+
+    const statusToSet =
+      existingStatus === "IN_GAME" || existingStatus === "QUEUED"
+        ? existingStatus
+        : "IDLE";
+
+    pipeline.hset(key, {
+      userId,
+      username: player.profile?.username,
+      rating: player.stats?.rating?.toString() || "0",
+      status: statusToSet, // <--- PRESERVE STATE
+      missedHeartbeats: "0",
+    });
+
+    pipeline.sadd("online_players", userId);
+    await pipeline.exec();
+
+    console.log(`[Presence] ${player.profile?.username} is now IDLE`);
+  } catch (error) {
+    console.error(`[Presence] Error connecting ${userId}:`, error);
   }
 };
 
+/**
+ * Handle Disconnection: Clean Redis and Update DB
+ */
+const handlePlayerDisconnected = async (payload: { userId: string }) => {
+  const { userId } = payload;
+  const key = `presence:${userId}`;
+
+  try {
+    // 1. Atomic Redis Cleanup
+    await redis.pipeline().del(key).srem(ONLINE_SET_KEY, userId).exec();
+
+    // 2. Persist "Last Seen" to PostgreSQL
+    await prisma.player.update({
+      where: { id: userId },
+      data: { updatedAt: new Date() },
+    });
+
+    console.log(`[Presence] ${userId} disconnected and archived`);
+  } catch (error) {
+    console.error(`[Presence] Error disconnecting ${userId}:`, error);
+  }
+};
+
+/**
+ * Handle Match Result: Update DB and Sync Redis
+ */
 const handleMatchEnded = async (payload: MatchEndedPayload) => {
   const { winnerId, loserId, isDraw } = payload;
 
@@ -116,24 +174,23 @@ const handleMatchEnded = async (payload: MatchEndedPayload) => {
       return { winnerNewRating, loserNewRating };
     });
 
-    const updateRedis = async (id: string, newRating: number) => {
+    // --- Conditional Redis Update ---
+    const syncRedis = async (id: string, newRating: number) => {
       const key = `presence:${id}`;
       if (await redis.exists(key)) {
         await redis.hset(key, {
           rating: newRating.toString(),
-          status: "IDLE",
+          status: "IDLE", // Match ended, move back from IN_GAME
         });
-        await redis.expire(key, PRESENCE_TTL);
       }
     };
 
     await Promise.all([
-      updateRedis(winnerId, results.winnerNewRating),
-      updateRedis(loserId, results.loserNewRating),
+      syncRedis(winnerId, results.winnerNewRating),
+      syncRedis(loserId, results.loserNewRating),
     ]);
-
   } catch (err) {
-    console.error("[PlayerService] Transaction failed:", err);
+    console.error("[Match] Transaction failed:", err);
     throw err;
   }
 };

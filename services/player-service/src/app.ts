@@ -4,6 +4,7 @@ import router from "./routes/index.js";
 import { initRabbit, consumeEvents } from "./services/rabbitmq.service.js";
 import { handleEvents } from "./consumers/Events.consumer.js";
 import { config } from "./config/env.js";
+import { startPresenceJanitor } from "./worker/janitor.worker.js";
 
 const app = express();
 
@@ -14,6 +15,8 @@ app.use("/", router);
 const startApp = async () => {
   await initRabbit();
   await consumeEvents(config.playerEventsQueue, handleEvents);
+
+  startPresenceJanitor()
 
   app.listen(config.port, () => {
     console.log(`[PlayerService] HTTP running on port ${config.port}`);

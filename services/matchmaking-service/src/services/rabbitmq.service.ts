@@ -1,5 +1,6 @@
 import amqp from "amqplib";
 import { config } from "../config/env.js";
+import { Event } from "../types/types.js";
 
 let channel: amqp.Channel | null = null;
 
@@ -42,7 +43,7 @@ export const initRabbit = async () => {
   }
 };
 
-export const consumeEvents = async (queue: string, handler: (event: any) => Promise<void>) => {
+export const consumeEvents = async (queue: string, handler: (event: Event) => Promise<void>) => {
   const ch = assertChannel();
 
   await ch.consume(queue, async (msg) => {
@@ -70,10 +71,11 @@ export const publishEvent = async (routingKey: string, payload: any) => {
 
   ch.publish(
     config.eventsExchange,
-    routingKey, // use the dynamic routing key
+    routingKey,
     Buffer.from(JSON.stringify(event)),
     { persistent: true }
   );
 
   console.log(`[EVENT] ${routingKey}`, payload);
 };
+

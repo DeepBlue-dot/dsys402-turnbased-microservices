@@ -66,3 +66,24 @@ export const consumeEvents = async (queue: string,
     }
   });
 };
+
+export const publishEvent = async (routingKey: string, payload: any) => {
+  const ch = assertChannel();
+
+  const event = {
+    type: routingKey,
+    data: payload,
+    occurredAt: new Date().toISOString(),
+  };
+
+  ch.publish(
+    config.eventsExchange,
+    routingKey,
+    Buffer.from(JSON.stringify(event)),
+    { persistent: true }
+  );
+
+  console.log(`[EVENT] ${routingKey}`, payload);
+};
+
+

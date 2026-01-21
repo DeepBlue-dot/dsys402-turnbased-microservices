@@ -1,110 +1,99 @@
 import { WebSocketServer } from "ws";
-import { authenticateWS } from "./ws.auth.js";
-import { connections } from "./presence.js";
-import { publish } from "../services/rabbitmq.service.js";
-import { handleClientMessage } from "./ws.handlers.js";
+import http from "http";
+import { authenticateWS } from "../middleware/auth.middleware.js";
+import { AuthenticatedSocket } from "../types/types.js";
+import { gatewayService } from "../services/gateway.service.js";
 import { config } from "../config/env.js";
-import { sendToPlayer } from "../consumers/gameEvents.consumer.js";
 
-const HEARTBEAT_INTERVAL = 30000; // 30s
-const MAX_MISSED_PINGS = 2;
+export const userSockets = new Map<string, AuthenticatedSocket>();
 
-export const startWSServer = (server: any) => {
-  const wss = new WebSocketServer({
-    server,
-    path: config.wsPath,
-  });
+export const startWSServer = (server: http.Server) => {
+  const wss = new WebSocketServer({ server, path: config.wsPath });
 
-  /* ---------- HEARTBEAT ---------- */
-  const interval = setInterval(() => {
-    wss.clients.forEach((socket) => {
-      const meta = [...connections.values()].find((c) => c.socket === socket);
+  const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      const socket = ws as AuthenticatedSocket;
 
-      if (!meta) return;
-
-      if (meta.missedPings >= MAX_MISSED_PINGS) {
-        console.log("[WS] Terminating dead socket");
-        socket.terminate();
-        return;
+      if (socket.isAlive === false) {
+        console.log(
+          `[Watchdog] Terminating non-responsive user: ${socket.userId}`,
+        );
+        return socket.terminate();
       }
 
-      meta.isAlive = false;
-      meta.missedPings += 1;
+      socket.isAlive = false;
       socket.ping();
     });
-  }, HEARTBEAT_INTERVAL);
+  }, 30000); // 30 second pulse
 
-  wss.on("close", () => clearInterval(interval));
+  wss.on("close", () => clearInterval(heartbeatInterval));
 
-  /* ---------- CONNECTION ---------- */
-  wss.on("connection", async (socket, req) => {
+  wss.on("connection", async (socket: AuthenticatedSocket, req) => {
     try {
-      const url = new URL(req.url!, "http://localhost");
-      const token = url.searchParams.get("token") || undefined;
+      const url = new URL(req.url || "", `http://${req.headers.host}`);
+      const token = url.searchParams.get("token");
 
-      const playerId = await authenticateWS(token);
+      const payload = authenticateWS(token || undefined);
+      const userId = payload.userId;
 
-      /* ---- RECONNECT LOGIC ---- */
-      if (connections.has(playerId)) {
-        connections.get(playerId)!.socket.close();
+      socket.userId = userId;
+      socket.isAlive = true;
+      userSockets.set(userId, socket);
 
-        await publish(config.playerEventsQueue, {
-          event: "player_reconnected",
-          playerId,
-          timestamp: Date.now(),
-        });
-      } else {
-        await publish(config.playerEventsQueue, {
-          event: "player_connected",
-          playerId,
-          timestamp: Date.now(),
-        });
-      }
-
-      connections.set(playerId, {
-        socket,
-        isAlive: true,
-        missedPings: 0,
+      socket.on("pong", async () => {
+        socket.isAlive = true;
+        await gatewayService.handleHeartbeat(userId);
       });
 
-      console.log("[WS] Connected:", playerId);
+      await gatewayService.handleConnect(userId);
 
-      sendToPlayer(playerId, {
-        event: "ws_connected",
-        playerId,
-        timestamp: Date.now(),
+      socket.on("message", async (data) => {
+        try {
+          const msg = JSON.parse(data.toString());
+
+          if (msg.type === "CHAT") {
+            await gatewayService.handlePrivateChat(
+              userId,
+              msg.to,
+              msg.matchId,
+              msg.text,
+            );
+          }
+        } catch (err) {
+          /* Malformed JSON */
+        }
       });
 
-      /* ---- HEARTBEAT RESPONSE ---- */
-      socket.on("pong", () => {
-        const meta = connections.get(playerId);
-        if (!meta) return;
-
-        meta.isAlive = true;
-        meta.missedPings = 0;
-      });
-
-      /* ---- CLIENT MESSAGES ---- */
-      socket.on("message", (data) =>
-        handleClientMessage(playerId, data.toString())
-      );
-
-      /* ---- DISCONNECT ---- */
       socket.on("close", async () => {
-        connections.delete(playerId);
-
-        await publish(config.playerEventsQueue, {
-          event: "player_disconnected",
-          playerId,
-          timestamp: Date.now(),
-        });
-
-        console.log("[WS] Disconnected:", playerId);
+        if (socket.wasKicked) {
+          console.log(
+            `[WS] Session transferred for ${userId}. Local cleanup skipped.`,
+          );
+          return;
+        }
+        if (userSockets.get(userId) === socket) {
+          userSockets.delete(userId);
+          await gatewayService.handleDisconnect(userId);
+        }
       });
-    } catch (err) {
-      console.error("[WS] Authentication failed");
-      console.log(err);
-      socket.close();
+
+      socket.on("error", (err) => {
+        console.error(`[WS] Error ${userId}:`, err.message);
+        socket.terminate();
+      });
+    } catch (err: any) {
+      socket.close(1008, "Unauthorized");
     }
   });
+};
+
+export const sendToUser = (userId: string, payload: any) => {
+  const socket = userSockets.get(userId);
+  
+  if (socket && socket.readyState === 1) { // 1 = OPEN
+    socket.send(JSON.stringify(payload));
+    return true;
+  }
+  
+  return false;
 };
