@@ -14,3 +14,21 @@ export const updatePasswordSchema = z.object({
   oldPassword: z.string().min(6),
   newPassword: z.string().min(6),
 });
+
+export const registerSchema = z.object({
+  username: z.string().min(3).max(20),
+  email: z.string().email(),
+  password: z.string().min(8).max(72),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+export const tokenSchema = z.object({
+  token: z.string().min(1),
+});
+
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;

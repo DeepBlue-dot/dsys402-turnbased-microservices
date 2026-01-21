@@ -12,6 +12,7 @@ const assertChannel = (): amqp.Channel => {
   return channel;
 };
 
+
 export const initRabbit = async () => {
   while (!channel) {
     try {
@@ -20,9 +21,21 @@ export const initRabbit = async () => {
       const conn = await amqp.connect(config.rabbitmqUrl);
       channel = await conn.createChannel();
 
+      await channel.assertExchange(config.eventsExchange, "topic", {
+        durable: true,
+      });
+
       await channel.assertQueue(config.playerEventsQueue, {
         durable: true,
       });
+
+      for (const key of config.playerRoutingKeys) {
+        await channel.bindQueue(
+          config.playerEventsQueue,
+          config.eventsExchange,
+          key
+        );
+      }
 
       console.log("[PlayerService] RabbitMQ connected");
     } catch (err) {
@@ -31,6 +44,7 @@ export const initRabbit = async () => {
     }
   }
 };
+
 
 export const consumeEvents = async (
   handler: (event: any) => Promise<void>

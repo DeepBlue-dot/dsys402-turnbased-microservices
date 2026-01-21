@@ -3,18 +3,23 @@ import cors from "cors";
 import router from "./routes/index.js";
 import { initRabbit, consumeEvents } from "./services/rabbitmq.service.js";
 import { handleEvents } from "./consumers/Events.consumer.js";
+import { config } from "./config/env.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use("/api", router);
+app.use("/", router);
 
-export const startApp = async () => {
+const startApp = async () => {
   await initRabbit();
   await consumeEvents(handleEvents);
+
+  app.listen(config.port, () => {
+    console.log(`[PlayerService] HTTP running on port ${config.port}`);
+  });
 
   console.log("[PlayerService] Event consumers started");
 };
 
-export default app;
+export default startApp;

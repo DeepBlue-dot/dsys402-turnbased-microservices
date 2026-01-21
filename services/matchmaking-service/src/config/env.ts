@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { SignOptions } from "jsonwebtoken";
 dotenv.config();
 
 const required = (k: string) => {
@@ -7,13 +8,18 @@ const required = (k: string) => {
 };
 
 export const config = {
-  matchmakingQueue: "matchmaking:queue",
+  eventsExchange: "events",
+  matchmakingQueue: "matchmaking.events.queue",
+
+  matchmakingRoutingKeys: ["player.created", "player.updated"],
 
   port: Number(process.env.PORT) || 3000,
 
-  redisUrl: process.env.REDIS_URL || required("REDIS_URL"),
+  redisUrl: required("REDIS_URL"),
 
-  rabbitmqUrl: process.env.RABBITMQ_URL || required("RABBITMQ_URL"),
+  rabbitmqUrl: required("RABBITMQ_URL"),
 
-  jwtSecret: process.env.JWT_SECRET || required("JWT_SECRET"),
+  jwtSecret: required("JWT_SECRET"),
+
+  jwtExpiry: (process.env.JWT_EXPIRES_IN ?? "1d") as SignOptions["expiresIn"],
 };

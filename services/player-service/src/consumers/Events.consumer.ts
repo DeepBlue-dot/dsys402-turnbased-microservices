@@ -37,15 +37,15 @@ const calculateElo = (winnerRating: number, loserRating: number) => {
 
 export const handleEvents = async (event: Event) => {
   switch (event.type) {
-    case "PLAYER_CONNECTED":
+    case "player.connected":
       await handlePlayerConnected(event.payload as PlayerConnectedPayload);
       break;
 
-    case "PLAYER_HEARTBEAT":
+    case "player.heartbeat":
       await handlePlayerHeartbeat(event.payload as PlayerHeartbeatPayload);
       break;
 
-    case "MATCH_ENDED":
+    case "match.ended":
       await handleMatchEnded(event.payload as MatchEndedPayload);
       break;
   }
