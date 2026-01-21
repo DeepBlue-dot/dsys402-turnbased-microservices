@@ -3,6 +3,7 @@ import matchmakingRoutes from "./routes/matchmaking.routes.js";
 import { config } from "./config/env.js";
 import { initRabbit, consumeEvents } from "./services/rabbitmq.service.js";
 import { startMatchmakingWorker } from "./worker/matchmaker.js";
+import { handleIncomingEvents } from "./consumers/Event.consumer.js";
 
 const app = express();
 app.use(express.json());
@@ -10,9 +11,8 @@ app.use("/", matchmakingRoutes);
 
 const startApp = async () => {
   await initRabbit();
-  await consumeEvents();
-  await startMatchmakingWorker(); 
-
+  await consumeEvents(config.matchmakingQueue, handleIncomingEvents);
+  await startMatchmakingWorker();
 
   app.listen(config.port, () => {
     console.log(`[Matchmaking] Running on ${config.port}`);
@@ -22,4 +22,3 @@ const startApp = async () => {
 };
 
 export default startApp;
-

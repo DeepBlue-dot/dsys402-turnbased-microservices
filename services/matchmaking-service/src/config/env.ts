@@ -11,7 +11,7 @@ export const config = {
   eventsExchange: "events",
   matchmakingQueue: "matchmaking.events.queue",
 
-  matchmakingRoutingKeys: ["player.created", "player.updated"],
+  matchmakingRoutingKeys: ["player.disconnected"],
 
   port: Number(process.env.PORT) || 3000,
 

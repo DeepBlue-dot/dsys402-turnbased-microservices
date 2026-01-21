@@ -70,9 +70,9 @@ export const publishEvent = async (routingKey: string, payload: any) => {
 
   ch.publish(
     config.eventsExchange,
-    "match.created",
+    routingKey, // use the dynamic routing key
     Buffer.from(JSON.stringify(event)),
-    { persistent: true },
+    { persistent: true }
   );
 
   console.log(`[EVENT] ${routingKey}`, payload);
