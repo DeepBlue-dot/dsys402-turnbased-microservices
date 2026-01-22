@@ -30,7 +30,6 @@ export const startPresenceJanitor = () => {
             // 2. EMIT the event so Matchmaking and Gateway can clean up
             await publishEvent("player.disconnected", {
               userId,
-              reason: "heartbeat_timeout",
             });
           }
         }

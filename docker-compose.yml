@@ -1,5 +1,15 @@
+# 1. Boilerplate Template
+x-common-logic: &common-logic
+  networks:
+    - game-network
+  restart: always
+  env_file: .env  # This is inherited by all services below
+  environment:
+    - NODE_ENV=${NODE_ENV:-production}
+
 services:
   nginx:
+    <<: *common-logic
     image: nginx:alpine
     ports:
       - "80:80"
@@ -8,84 +18,101 @@ services:
     depends_on:
       - event-service
       - player-service
+    ulimits:
+      nofile:
+        soft: 20000
+        hard: 20000
 
+  # --- INFRASTRUCTURE ---
   rabbitmq:
+    <<: *common-logic
     image: rabbitmq:3-management
     ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      - "15672:15672" 
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
-    image: redis:7
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD}
-    ports:
-      - "6379:6379"
+    <<: *common-logic
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redisstrongpassword}
     volumes:
       - redis-data:/data
 
   mongodb:
+    <<: *common-logic
     image: mongo:6
-    ports:
-      - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
+      # These variables tell Mongo how to create the admin user on first boot
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASS}
     volumes:
       - mongo-data:/data/db
 
   postgres:
-    image: postgres:15
-    ports:
-      - "5432:5432"
+    <<: *common-logic
+    image: postgres:15-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      # These variables tell Postgres how to setup the DB on first boot
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
     volumes:
       - pg-data:/var/lib/postgresql/data
 
+  # --- MICROSERVICES ---
   event-service:
+    <<: *common-logic
     build: ./services/event-service
-    env_file:
-      - ./services/event-service/.env
+    environment:
+      - PORT=${EVENT_SERVICE_PORT}
+      - WS_PATH=${WS_PATH}
     depends_on:
-      - rabbitmq
-    ports:
-      - "4000:4000"
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      replicas: 2
 
   matchmaking-service:
+    <<: *common-logic
     build: ./services/matchmaking-service
-    env_file:
-      - ./services/matchmaking-service/.env
+    environment:
+      - PORT=${MATCHMAKING_SERVICE_PORT}
     depends_on:
-      - rabbitmq
-      - redis
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   game-logic-service:
+    <<: *common-logic
     build: ./services/game-logic-service
-    env_file:
-      - ./services/game-logic-service/.env
+    environment:
+      - PORT=${GAME_LOGIC_SERVICE_PORT}
     depends_on:
-      - rabbitmq
-      - mongodb
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
 
   player-service:
+    <<: *common-logic
     build: ./services/player-service
-    env_file:
-      - ./services/player-service/.env
+    environment:
+      - PORT=${PLAYER_SERVICE_PORT}
     depends_on:
-      - postgres
-      
+      postgres:
+        condition: service_healthy
+
+networks:
+  game-network:
+    driver: bridge
 
 volumes:
   mongo-data:

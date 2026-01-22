@@ -10,10 +10,12 @@ interface PlayerConnectedPayload {
   instanceId: string;
 }
 interface MatchEndedPayload {
-  winnerId: string;
-  loserId: string;
-  isDraw: boolean;
+  matchId: string;
+  players: string[];       // All players in the match
+  winnerId: string | null; // null if draw
+  reason: string;          // e.g., "DRAW", "FORFEIT", "COMPLETED"
 }
+
 
 const calculateElo = (winnerRating: number, loserRating: number) => {
   const K = 32;
@@ -140,60 +142,68 @@ const handlePlayerDisconnected = async (payload: { userId: string }) => {
 /**
  * Handle Match Result: Update DB and Sync Redis
  */
+
 const handleMatchEnded = async (payload: MatchEndedPayload) => {
-  const { winnerId, loserId, isDraw } = payload;
+  const { players, winnerId, reason } = payload;
+
+  // Determine loserId and isDraw for Elo calculation
+  const isDraw = winnerId === null;
+  const loserId = isDraw ? "" : players.find((id) => id !== winnerId)!;
 
   try {
     const results = await prisma.$transaction(async (tx) => {
-      const [winnerStats, loserStats] = await Promise.all([
-        tx.playerStats.findUnique({ where: { playerId: winnerId } }),
-        tx.playerStats.findUnique({ where: { playerId: loserId } }),
-      ]);
+      // Only update Elo if not a draw
+      if (!isDraw) {
+        const [winnerStats, loserStats] = await Promise.all([
+          tx.playerStats.findUnique({ where: { playerId: winnerId } }),
+          tx.playerStats.findUnique({ where: { playerId: loserId } }),
+        ]);
 
-      if (!winnerStats || !loserStats) throw new Error("Stats not found");
+        if (!winnerStats || !loserStats) throw new Error("Stats not found");
 
-      let winnerNewRating = winnerStats.rating;
-      let loserNewRating = loserStats.rating;
+        const ratings = calculateElo(winnerStats.rating, loserStats.rating);
 
-      if (isDraw) {
+        await Promise.all([
+          tx.playerStats.update({
+            where: { playerId: winnerId },
+            data: { wins: { increment: 1 }, rating: ratings.winnerNewRating },
+          }),
+          tx.playerStats.update({
+            where: { playerId: loserId },
+            data: { losses: { increment: 1 }, rating: ratings.loserNewRating },
+          }),
+        ]);
+
+        return ratings;
+      } else {
+        // Draw: increment draws for all players
         await tx.playerStats.updateMany({
-          where: { playerId: { in: [winnerId, loserId] } },
+          where: { playerId: { in: players } },
           data: { draws: { increment: 1 } },
         });
-      } else {
-        const ratings = calculateElo(winnerStats.rating, loserStats.rating);
-        winnerNewRating = ratings.winnerNewRating;
-        loserNewRating = ratings.loserNewRating;
-
-        await tx.playerStats.update({
-          where: { playerId: winnerId },
-          data: { wins: { increment: 1 }, rating: winnerNewRating },
-        });
-
-        await tx.playerStats.update({
-          where: { playerId: loserId },
-          data: { losses: { increment: 1 }, rating: loserNewRating },
-        });
+        return { winnerNewRating: 0, loserNewRating: 0 };
       }
-
-      return { winnerNewRating, loserNewRating };
     });
 
-    // --- Conditional Redis Update ---
+    // --- Optional Redis Update ---
     const syncRedis = async (id: string, newRating: number) => {
       const key = `presence:${id}`;
       if (await redis.exists(key)) {
         await redis.hset(key, {
           rating: newRating.toString(),
-          status: "IDLE", // Match ended, move back from IN_GAME
+          status: "IDLE",
         });
       }
     };
 
-    await Promise.all([
-      syncRedis(winnerId, results.winnerNewRating),
-      syncRedis(loserId, results.loserNewRating),
-    ]);
+    if (!isDraw) {
+      await Promise.all([
+        syncRedis(winnerId!, results.winnerNewRating),
+        syncRedis(loserId, results.loserNewRating),
+      ]);
+    } else {
+      await Promise.all(players.map((id) => syncRedis(id, 0)));
+    }
   } catch (err) {
     console.error("[Match] Transaction failed:", err);
     throw err;
