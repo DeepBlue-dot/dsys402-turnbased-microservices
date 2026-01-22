@@ -50,19 +50,41 @@ export const startWSServer = (server: http.Server) => {
       socket.on("message", async (data) => {
         try {
           const msg = JSON.parse(data.toString());
-              const { type, payload } = msg;
+          const { type, payload } = msg;
 
+          switch (type) {
+            case "CHAT":
+              await gatewayService.handlePrivateChat(
+                userId,
+                msg.to,
+                msg.matchId,
+                msg.text,
+              );
+              break;
 
-              switch (type) {
-                case "CHAT":
-                await gatewayService.handlePrivateChat(
-              userId,
-              msg.to,
-              msg.matchId,
-              msg.text,
-            );
-                  break;
-              }
+            case "GAME_MOVE":
+              await gatewayService.handleGameMove(
+                userId,
+                payload.matchId,
+                payload.move,
+              );
+              break;
+
+            case "GAME_FORFEIT":
+              await gatewayService.handleGameForfeit(userId, payload.matchId);
+              break;
+
+            case "SYNC_REQUEST":
+              const currentState =
+                await gatewayService.handleSyncRequest(userId);
+              socket.send(
+                JSON.stringify({
+                  type: "SYNC_RESPONSE",
+                  data: currentState,
+                }),
+              );
+              break;
+          }
         } catch (err) {
           /* Malformed JSON */
         }
@@ -93,11 +115,12 @@ export const startWSServer = (server: http.Server) => {
 
 export const sendToUser = (userId: string, payload: any) => {
   const socket = userSockets.get(userId);
-  
-  if (socket && socket.readyState === 1) { // 1 = OPEN
+
+  if (socket && socket.readyState === 1) {
+    // 1 = OPEN
     socket.send(JSON.stringify(payload));
     return true;
   }
-  
+
   return false;
 };

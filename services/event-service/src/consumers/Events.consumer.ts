@@ -20,12 +20,15 @@ export const handleEvents = async (event: {
     case "match.created":
       await handleMatchCreated(event.data);
       break;
+      
+    case "match.failed":
+      await handleMatchFailed(event.data);
+      break;
 
     default:
       break;
   }
 };
-
 
 const normalizeEventType = (type: string): string => {
   const suffix = `.${config.instanceId}`;
@@ -44,14 +47,14 @@ const handlePlayerKick = async (payload: { userId: string }) => {
     localSocket.wasKicked = true;
 
     console.log(
-      `[WS] Kicking local session for ${payload.userId} (new login detected)`
+      `[WS] Kicking local session for ${payload.userId} (new login detected)`,
     );
 
     localSocket.send(
       JSON.stringify({
         type: "ERROR",
         message: "You have been logged in from another device.",
-      })
+      }),
     );
 
     localSocket.terminate();
@@ -83,12 +86,37 @@ const handleMatchCreated = async (payload: {
   mode: string;
 }) => {
   payload.players.forEach((userId) => {
+    if (userSockets.has(userId)) {
+      const opponentId = payload.players.find((id) => id !== userId);
+
+      sendToUser(userId, {
+        type: "MATCH_CREATED",
+        data: {
+          matchId: payload.matchId,
+          opponentId,
+          mode: payload.mode,
+        },
+      });
+
+      console.log(
+        `[WS:Push] Notified local user ${userId} of match ${payload.matchId}`,
+      );
+    }
+  });
+};
+
+const handleMatchFailed = async (payload: {
+  matchId: string;
+  players: string[];
+  reason: string;
+}) => {
+  payload.players.forEach((userId) => {
+    // We only notify users connected to THIS gateway instance
     sendToUser(userId, {
-      type: "MATCH_CREATED",
+      type: "MATCH_ERROR",
       data: {
-        matchId: payload.matchId,
-        opponentId: payload.players.find((id) => id !== userId),
-        mode: payload.mode,
+        reason: "Game failed to start. Returning to lobby...",
+        code: payload.reason,
       },
     });
   });
