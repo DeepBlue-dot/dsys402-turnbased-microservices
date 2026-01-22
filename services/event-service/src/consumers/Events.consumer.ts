@@ -1,11 +1,14 @@
 import { sendToUser, userSockets } from "../ws/ws.server.js";
+import { config } from "../config/env.js";
 
 export const handleEvents = async (event: {
   type: string;
   data: any;
   occurredAt: string;
 }) => {
-  switch (event.type) {
+  const baseType = normalizeEventType(event.type);
+
+  switch (baseType) {
     case "player.kick":
       await handlePlayerKick(event.data);
       break;
@@ -17,25 +20,42 @@ export const handleEvents = async (event: {
     case "match.created":
       await handleMatchCreated(event.data);
       break;
+
+    default:
+      break;
   }
 };
 
-const handlePlayerKick = async (playload: { userId: string }) => {
-  const localSocket = userSockets.get(playload.userId);
+
+const normalizeEventType = (type: string): string => {
+  const suffix = `.${config.instanceId}`;
+
+  if (type.endsWith(suffix)) {
+    return type.slice(0, -suffix.length);
+  }
+
+  return type;
+};
+
+const handlePlayerKick = async (payload: { userId: string }) => {
+  const localSocket = userSockets.get(payload.userId);
 
   if (localSocket) {
     localSocket.wasKicked = true;
+
     console.log(
-      `[WS] Kicking local session for ${playload.userId} (new login detected)`,
+      `[WS] Kicking local session for ${payload.userId} (new login detected)`
     );
+
     localSocket.send(
       JSON.stringify({
         type: "ERROR",
         message: "You have been logged in from another device.",
-      }),
+      })
     );
+
     localSocket.terminate();
-    userSockets.delete(playload.userId);
+    userSockets.delete(payload.userId);
   }
 };
 

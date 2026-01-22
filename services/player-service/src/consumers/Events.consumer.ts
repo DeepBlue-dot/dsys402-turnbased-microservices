@@ -7,6 +7,7 @@ const ONLINE_SET_KEY = "online_players";
 // Types
 interface PlayerConnectedPayload {
   userId: string;
+  instanceId: string;
 }
 interface MatchEndedPayload {
   winnerId: string;
@@ -30,7 +31,11 @@ const calculateElo = (winnerRating: number, loserRating: number) => {
 /**
  * Main Event Discriminator
  */
-export const handleEvents = async (event: { type: string; data: any, occurredAt:string }) => {
+export const handleEvents = async (event: {
+  type: string;
+  data: any;
+  occurredAt: string;
+}) => {
   switch (event.type) {
     case "player.connected":
       await handlePlayerConnected(event.data);
@@ -68,7 +73,7 @@ const handlePlayerHeartbeat = async (payload: { userId: string }) => {
  * Handle Connection: Fetch from DB and Prime Redis
  */
 const handlePlayerConnected = async (payload: PlayerConnectedPayload) => {
-  const { userId } = payload;
+  const { userId, instanceId } = payload;
   const key = `presence:${userId}`;
 
   try {
@@ -95,7 +100,8 @@ const handlePlayerConnected = async (payload: PlayerConnectedPayload) => {
     pipeline.hset(key, {
       userId,
       rating: player.stats?.rating?.toString() || "0",
-      status: statusToSet, // <--- PRESERVE STATE
+      status: statusToSet,
+      instanceId,
       missedHeartbeats: "0",
     });
 

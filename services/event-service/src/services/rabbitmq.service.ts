@@ -14,37 +14,53 @@ const assertChannel = (): amqp.Channel => {
 export const initRabbit = async () => {
   while (!channel) {
     try {
-      console.log("[GATEWAY] Connecting to RabbitMQ...");
+      console.log(
+        `[GATEWAY:${config.instanceId}] Connecting to RabbitMQ...`
+      );
 
       const connection = await amqp.connect(config.rabbitmqUrl);
       channel = await connection.createChannel();
 
+      // Topic exchange for Broadcast + Unicast routing
       await channel.assertExchange(config.eventsExchange, "topic", {
         durable: true,
       });
 
+      // Instance-owned queue (State-Affinity)
       await channel.assertQueue(config.gatewayQueue, {
-        durable: false,
-        autoDelete: true
+        exclusive: true, // 🔑 stronger than autoDelete
       });
 
-      for (const key of config.gatewayRoutingKeys) {
+      for (const key of config.broadcastRoutingKeys) {
         await channel.bindQueue(
           config.gatewayQueue,
           config.eventsExchange,
-          key,
+          key
         );
       }
 
-      console.log("[GATEWAY] RabbitMQ connected");
+     await channel.bindQueue(
+        config.gatewayQueue,
+        config.eventsExchange,
+        config.unicastPattern
+      );
+
+      console.log(
+        `[GATEWAY:${config.instanceId}] RabbitMQ connected`
+      );
     } catch (err) {
-      console.error("[GATEWAY] RabbitMQ not ready, retrying...");
+      console.error(
+        `[GATEWAY:${config.instanceId}] RabbitMQ not ready, retrying...`
+      );
       await wait(5000);
     }
   }
 };
 
-export const consumeEvents = async (queue: string, handler: (event: Event) => Promise<void>) => {
+export const consumeEvents = async (
+  queue: string,
+  handler: (event: Event) => Promise<void>
+) => {
   const ch = assertChannel();
 
   await ch.consume(queue, async (msg) => {
@@ -56,15 +72,18 @@ export const consumeEvents = async (queue: string, handler: (event: Event) => Pr
       ch.ack(msg);
     } catch (err) {
       console.error("[GATEWAY] Event handling failed", err);
-      ch.nack(msg, false, false);
+      ch.nack(msg, false, false); // drop poison messages
     }
   });
 };
 
-export const publishEvent = async (routingKey: string, payload: any) => {
+export const publishEvent = async (
+  routingKey: string,
+  payload: any
+) => {
   const ch = assertChannel();
 
-  const event = {
+  const event: Event = {
     type: routingKey,
     data: payload,
     occurredAt: new Date().toISOString(),
@@ -79,4 +98,3 @@ export const publishEvent = async (routingKey: string, payload: any) => {
 
   console.log(`[EVENT] ${routingKey}`, payload);
 };
-

@@ -50,15 +50,19 @@ export const startWSServer = (server: http.Server) => {
       socket.on("message", async (data) => {
         try {
           const msg = JSON.parse(data.toString());
+              const { type, payload } = msg;
 
-          if (msg.type === "CHAT") {
-            await gatewayService.handlePrivateChat(
+
+              switch (type) {
+                case "CHAT":
+                await gatewayService.handlePrivateChat(
               userId,
               msg.to,
               msg.matchId,
               msg.text,
             );
-          }
+                  break;
+              }
         } catch (err) {
           /* Malformed JSON */
         }

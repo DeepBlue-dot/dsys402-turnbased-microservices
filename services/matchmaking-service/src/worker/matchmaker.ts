@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 
 const QUEUE_KEY = "match:queue:ranked";
 const JOIN_TIMES_KEY = "match:join_times";
+const USER_LOCATION_KEY = (userId: string) => `user:location:${userId}`;
+
 
 
 export const startMatchmakingWorker = () => {
@@ -73,50 +75,79 @@ async function findPartner(id: string, rating: number, range: number): Promise<{
 
 /**
  * Handles pairing with an atomic lock and fallback rollback
- */
-async function createMatch(p1: string, p2: string, r1: number, r2: number) {
-  // ATOMIC LOCK
+ */async function createMatch(p1: string, p2: string, r1: number, r2: number) {
+  // 1. ATOMIC LOCK: Remove both players from the Sorted Set queue
+  // If this returns < 2, another worker instance already matched one of these players
   const removedCount = await redis.zrem(QUEUE_KEY, p1, p2);
-  if (removedCount !== 2) return; 
+  if (removedCount !== 2) return;
 
   const matchId = uuidv4();
 
   try {
-    const [exists1, exists2] = await Promise.all([
-      redis.exists(`presence:${p1}`),
-      redis.exists(`presence:${p2}`)
+    // 2. FETCH TARGET LOCATIONS (Now inside the presence hash)
+    const [p1Data, p2Data] = await Promise.all([
+      redis.hgetall(`presence:${p1}`),
+      redis.hgetall(`presence:${p2}`)
     ]);
 
     const pipeline = redis.pipeline();
-    if (exists1) pipeline.hset(`presence:${p1}`, "status", "IN_GAME");
-    if (exists2) pipeline.hset(`presence:${p2}`, "status", "IN_GAME");
+
+    // 3. STATUS UPDATES
+    // We only update status if the presence hash still exists (Object.keys check)
+    const p1Exists = p1Data && Object.keys(p1Data).length > 0;
+    const p2Exists = p2Data && Object.keys(p2Data).length > 0;
+
+    if (p1Exists) pipeline.hset(`presence:${p1}`, "status", "IN_GAME");
+    if (p2Exists) pipeline.hset(`presence:${p2}`, "status", "IN_GAME");
+    
     pipeline.hdel(JOIN_TIMES_KEY, p1, p2);
     await pipeline.exec();
 
-    // PUBLISH EVENT
-    await publishEvent("match.created", {
-      matchId,
-      players: [p1, p2],
-      mode: "ranked"
-    });
+    // 4. TARGETED PUBLISHING
+    // We send the 'match.created' event ONLY to the specific Gateway instances 
+    // where these players are physically connected.
+    const instance1 = p1Data.instanceId;
+    const instance2 = p2Data.instanceId;
 
-    console.log(`[Matchmaker] Match Created: ${p1} vs ${p2} | ID: ${matchId}`);
+    if (instance1) {
+      await publishEvent(`match.created.${instance1}`, {
+        matchId,
+        players: [p1, p2],
+        mode: "ranked"
+      });
+    }
+
+    // Only send a second event if the players are on DIFFERENT instances
+    if (instance2 && instance2 !== instance1) {
+      await publishEvent(`match.created.${instance2}`, {
+        matchId,
+        players: [p1, p2],
+        mode: "ranked"
+      });
+    }
+
+    console.log(`[Matchmaker] Success: ${matchId} | Instances: ${instance1}, ${instance2}`);
+
   } catch (err) {
-    console.error("[Matchmaker] CRITICAL: Publish Failed. Rolling back players...");
+    console.error("[Matchmaker] CRITICAL: Match finalization failed. Rolling back players to queue...");
 
-    // ROLLBACK: Put players back in queue using the r1, r2 values provided
+    // 5. THE ROLLBACK
+    // If RabbitMQ fails or Redis errors out, we must put them back in the queue
+    // using the original ratings (r1, r2) provided by the worker loop.
     await redis.pipeline()
       .hset(`presence:${p1}`, "status", "QUEUED")
       .hset(`presence:${p2}`, "status", "QUEUED")
       .zadd(QUEUE_KEY, r1, p1)
       .zadd(QUEUE_KEY, r2, p2)
-      .hset(JOIN_TIMES_KEY, p1, (Date.now() - 30000).toString())
+      .hset(JOIN_TIMES_KEY, p1, (Date.now() - 30000).toString()) // Re-queue at the front
       .hset(JOIN_TIMES_KEY, p2, (Date.now() - 30000).toString())
       .exec();
   }
 }
 
-
+/**
+ * Basic cleanup for matchmaking data structures
+ */
 async function cleanupPlayer(userId: string) {
   await redis.pipeline()
     .zrem(QUEUE_KEY, userId)

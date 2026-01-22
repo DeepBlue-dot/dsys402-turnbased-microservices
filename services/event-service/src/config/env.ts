@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import { SignOptions } from "jsonwebtoken";
 import os from "os";
 import crypto from "crypto";
+
 dotenv.config();
 
 const required = (k: string) => {
@@ -9,23 +10,36 @@ const required = (k: string) => {
   return process.env[k]!;
 };
 
-const instanceId = `${os.hostname()}-${crypto.randomBytes(4).toString("hex")}`;
+// Stable per-gateway identity (State-Affinity)
+const instanceId =
+  process.env.INSTANCE_ID ??
+  `${os.hostname()}-${crypto.randomBytes(4).toString("hex")}`;
 
 export const config = {
-  eventsExchange: "events",
+  // 🔑 Gateway Identity
+  instanceId,
 
+  // 📨 RabbitMQ
+  eventsExchange: "events",
   gatewayQueue: `gateway.queue.${instanceId}`,
 
-  gatewayRoutingKeys: [
-    "match.created", 
+    broadcastRoutingKeys: [
     "player.kick",
-    "chat.private"
+    "system.announcement",
   ],
 
+    unicastPattern: `*.#.${instanceId}`, 
+
+
+  // 🌐 Server
   port: Number(process.env.PORT) || 4000,
-  redisUrl: required("REDIS_URL"),
-  rabbitmqUrl: required("RABBITMQ_URL"),
+  wsPath: required("WS_PATH"),
+
+  // 🔐 Security
   jwtSecret: required("JWT_SECRET"),
   jwtExpiry: (process.env.JWT_EXPIRES_IN ?? "1d") as SignOptions["expiresIn"],
-  wsPath: required("WS_PATH"),
+
+  // 🗄 Infrastructure
+  redisUrl: required("REDIS_URL"),
+  rabbitmqUrl: required("RABBITMQ_URL"),
 };
