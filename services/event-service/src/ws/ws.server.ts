@@ -62,6 +62,7 @@ export const startWSServer = (server: http.Server) => {
         try {
           const msg = JSON.parse(data.toString());
           const { type, payload } = msg;
+          let success = false;
 
           switch (type) {
             case "CHAT":
@@ -71,6 +72,7 @@ export const startWSServer = (server: http.Server) => {
                 msg.matchId,
                 msg.text,
               );
+              success=true;
               break;
 
             case "GAME_MOVE":
@@ -79,10 +81,12 @@ export const startWSServer = (server: http.Server) => {
                 payload.matchId,
                 payload.move,
               );
+              success=true;
               break;
 
             case "GAME_FORFEIT":
               await gatewayService.handleGameForfeit(userId, payload.matchId);
+              success=true;
               break;
 
             case "SYNC_REQUEST":
@@ -94,10 +98,33 @@ export const startWSServer = (server: http.Server) => {
                   data: currentState,
                 }),
               );
+              success=true;
+              break;
+            default:
+              socket.send(
+                JSON.stringify({
+                  type: "ERROR",
+                  data: `Unknown message type: "${type}"`,
+                }),
+              );
               break;
           }
-        } catch (err) {
-          /* Malformed JSON */
+
+          socket.send(
+            JSON.stringify({
+              type: "ACK",
+              data: { originalType: type, success },
+            }),
+          );
+        } catch (err: any) {
+          console.error(`[WS] Error processing message from ${userId}:`, err);
+
+          socket.send(
+            JSON.stringify({
+              type: "ERROR",
+              data: err?.message || "Invalid message format",
+            }),
+          );
         }
       });
 
@@ -133,7 +160,7 @@ export const sendToUser = (userId: string, payload: any) => {
       timestamp: new Date().toISOString(),
       // or use milliseconds: Date.now()
     };
-    
+
     socket.send(JSON.stringify(payloadWithTimestamp));
     return true;
   }

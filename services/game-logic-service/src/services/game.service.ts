@@ -17,7 +17,6 @@ export const gameService = {
     return { userId, instanceId: data.instanceId };
   },
 
-  
   async setTurnTimer(matchId: string) {
     const deadline = Date.now() + config.turnTimeoutSec * 1000;
     await redis.zadd(TIMERS_KEY, deadline, matchId);
@@ -27,24 +26,33 @@ export const gameService = {
     await redis.zrem(TIMERS_KEY, matchId);
   },
 
-
   /**
    * INITIALIZE: Send specific "Match Started" event to each player
    */
   async initializeGame(matchId: string, players: string[]) {
     try {
-      const locations = await Promise.all(players.map(id => this.getPlayerLocation(id)));
-      
-      if (locations.some(l => l === null)) {
-        const innocentPlayers = locations.filter(l => l !== null).map(l => l!.userId);
-        return await publishEvent("match.failed", { matchId, players, reason: "PLAYER_OFFLINE", innocentPlayers });
+      const locations = await Promise.all(
+        players.map((id) => this.getPlayerLocation(id)),
+      );
+
+      if (locations.some((l) => l === null)) {
+        const innocentPlayers = locations
+          .filter((l) => l !== null)
+          .map((l) => l!.userId);
+        return await publishEvent("match.failed", {
+          matchId,
+          players,
+          reason: "PLAYER_OFFLINE",
+          innocentPlayers,
+        });
       }
 
       const board: Board = Array(9).fill("");
       const symbols = { [players[0]]: "X", [players[1]]: "O" };
       const expiresAt = Date.now() + config.turnTimeoutSec * 1000;
 
-      await redis.pipeline()
+      await redis
+        .pipeline()
         .hset(`game:match:${matchId}`, {
           matchId,
           players: JSON.stringify(players),
@@ -52,7 +60,7 @@ export const gameService = {
           symbols: JSON.stringify(symbols),
           turn: players[0],
           status: "ACTIVE",
-          expiresAt: expiresAt.toString()
+          expiresAt: expiresAt.toString(),
         })
         .set(`player:match_map:${players[0]}`, matchId)
         .set(`player:match_map:${players[1]}`, matchId)
@@ -69,14 +77,18 @@ export const gameService = {
             recipientId: loc.userId, // 🔑 Tells Gateway exactly who to notify
             matchId,
             mySymbol: symbols[loc.userId],
-            opponentId: players.find(id => id !== loc.userId),
+            opponentId: players.find((id) => id !== loc.userId),
             turn: players[0],
-            expiresAt
+            expiresAt,
           });
         }
       }
     } catch (err) {
-      await publishEvent("match.failed", { matchId, players, reason: "INTERNAL_ERROR" });
+      await publishEvent("match.failed", {
+        matchId,
+        players,
+        reason: "INTERNAL_ERROR",
+      });
     }
   },
 
@@ -86,11 +98,36 @@ export const gameService = {
   async processMove(matchId: string, userId: string, position: number) {
     const key = `game:match:${matchId}`;
     const state = await redis.hgetall(key);
-    if (!state || Object.keys(state).length === 0 || state.turn !== userId) return;
+
+    // ❌ Invalid: match doesn't exist or not user's turn
+    if (!state || Object.keys(state).length === 0 || state.turn !== userId) {
+      const loc = await this.getPlayerLocation(userId);
+      if (loc) {
+        await publishEvent(`game.event.invalid.${loc.instanceId}`, {
+          recipientId: userId,
+          matchId,
+          reason: !state ? "MATCH_NOT_FOUND" : "NOT_YOUR_TURN",
+        });
+      }
+      return;
+    }
 
     const board: Board = JSON.parse(state.board);
-    if (board[position] !== "") return;
 
+    // ❌ Invalid: cell already taken
+    if (board[position] !== "") {
+      const loc = await this.getPlayerLocation(userId);
+      if (loc) {
+        await publishEvent(`game.event.invalid.${loc.instanceId}`, {
+          recipientId: userId,
+          matchId,
+          reason: "CELL_OCCUPIED",
+        });
+      }
+      return;
+    }
+
+    // ✅ Valid move: proceed as normal
     await this.clearTurnTimer(matchId);
     const symbols = JSON.parse(state.symbols);
     board[position] = symbols[userId];
@@ -98,22 +135,29 @@ export const gameService = {
     const { status, winner } = ticTacToeEngine.getGameState(board);
 
     if (status !== "ONGOING") {
-      await this.endGame(matchId, board, winner ? userId : null, status === "WIN" ? "COMPLETED" : "DRAW");
+      await this.endGame(
+        matchId,
+        board,
+        winner ? userId : null,
+        status === "WIN" ? "COMPLETED" : "DRAW",
+      );
     } else {
       const players: string[] = JSON.parse(state.players);
-      const nextTurn = players.find(id => id !== userId)!;
+      const nextTurn = players.find((id) => id !== userId)!;
       const expiresAt = Date.now() + config.turnTimeoutSec * 1000;
 
       await redis.hset(key, {
         board: JSON.stringify(board),
         turn: nextTurn,
-        expiresAt: expiresAt.toString()
+        expiresAt: expiresAt.toString(),
       });
 
       await this.setTurnTimer(matchId);
 
-      // 🎯 PER-PLAYER PUBLISH
-      const locations = await Promise.all(players.map(id => this.getPlayerLocation(id)));
+      // 🎯 Notify both players
+      const locations = await Promise.all(
+        players.map((id) => this.getPlayerLocation(id)),
+      );
       for (const loc of locations) {
         if (loc) {
           await publishEvent(`game.event.turn.${loc.instanceId}`, {
@@ -121,33 +165,47 @@ export const gameService = {
             matchId,
             board,
             nextTurn,
-            isMyTurn: nextTurn === loc.userId, // 🔑 Logic helper for frontend
-            expiresAt
+            isMyTurn: nextTurn === loc.userId,
+            expiresAt,
           });
         }
       }
     }
   },
-
   /**
    * END GAME: Send final results to each player
    */
-  async endGame(matchId: string, finalBoard: Board, winnerId: string | null, reason: string) {
+  async endGame(
+    matchId: string,
+    finalBoard: Board,
+    winnerId: string | null,
+    reason: string,
+  ) {
     const state = await redis.hgetall(`game:match:${matchId}`);
     if (!state || Object.keys(state).length === 0) return;
 
     const players: string[] = JSON.parse(state.players);
 
     // 1. Archive
-    await MatchHistory.create({ matchId, players, winnerId, finalBoard, reason });
+    await MatchHistory.create({
+      matchId,
+      players,
+      winnerId,
+      finalBoard,
+      reason,
+    });
 
     // 2. Locate and Update Status
-    const locations = await Promise.all(players.map(id => this.getPlayerLocation(id)));
+    const locations = await Promise.all(
+      players.map((id) => this.getPlayerLocation(id)),
+    );
     const pipeline = redis.pipeline();
     for (const pid of players) {
       pipeline.del(`player:match_map:${pid}`);
       if (await redis.exists(`${PRESENCE_PREFIX}${pid}`)) {
-        pipeline.hset(`${PRESENCE_PREFIX}${pid}`, { status: "IDLE" }).hdel(`${PRESENCE_PREFIX}${pid}`, "matchId");
+        pipeline
+          .hset(`${PRESENCE_PREFIX}${pid}`, { status: "IDLE" })
+          .hdel(`${PRESENCE_PREFIX}${pid}`, "matchId");
       }
     }
     pipeline.del(`game:match:${matchId}`).zrem(TIMERS_KEY, matchId);
@@ -159,9 +217,14 @@ export const gameService = {
         await publishEvent(`match.ended.${loc.instanceId}`, {
           recipientId: loc.userId,
           matchId,
-          result: winnerId === loc.userId ? "WIN" : winnerId === null ? "DRAW" : "LOSS",
+          result:
+            winnerId === loc.userId
+              ? "WIN"
+              : winnerId === null
+                ? "DRAW"
+                : "LOSS",
           reason,
-          finalBoard
+          finalBoard,
         });
       }
     }

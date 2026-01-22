@@ -41,6 +41,14 @@ services:
     command: redis-server --requirepass ${REDIS_PASSWORD:-redisstrongpassword}
     volumes:
       - redis-data:/data
+      
+  redis-insight:
+    <<: *common-logic
+    image: redis/redisinsight:latest
+    ports:
+      - "5540:5540"   # Exposes the web UI on http://localhost:5540
+    depends_on:
+      - redis
 
   mongodb:
     <<: *common-logic
