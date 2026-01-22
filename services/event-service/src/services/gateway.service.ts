@@ -6,8 +6,8 @@ const QUEUE_KEY = "match:queue:ranked";
 const JOIN_TIMES_KEY = "match:join_times";
 
 export const gatewayService = {
-  async handleConnect(userId: string) {
-    await publishEvent("player.kick", { userId });
+  async handleConnect(userId: string, sessionId: string) {
+    await publishEvent("player.kick", { userId, sessionId });
 
     await publishEvent("player.connected", {
       userId,
@@ -39,7 +39,7 @@ export const gatewayService = {
       redis.hgetall(presenceKey),
       redis.get(`player:match_map:${userId}`), // Direct index lookup
       redis.zrank(QUEUE_KEY, userId),
-      redis.hget(JOIN_TIMES_KEY, userId)
+      redis.hget(JOIN_TIMES_KEY, userId),
     ]);
 
     if (!presence || Object.keys(presence).length === 0) {
@@ -57,27 +57,40 @@ export const gatewayService = {
       state.status = "QUEUED";
       state.queue = {
         position: queueRank !== null ? queueRank + 1 : null,
-        waitTimeSeconds: joinTime ? Math.floor((Date.now() - parseInt(joinTime)) / 1000) : 0,
+        waitTimeSeconds: joinTime
+          ? Math.floor((Date.now() - parseInt(joinTime)) / 1000)
+          : 0,
       };
     }
 
     // --- Scenario: IN_GAME ---
-    // If the index (match_map) exists, the player is officially in a match
+
     if (matchId) {
-      const gameData = await redis.hgetall(`game:match:${matchId}`);
+      const gameKey = `game:match:${matchId}`;
+      const gameData = await redis.hgetall(gameKey);
 
       if (gameData && Object.keys(gameData).length > 0) {
+        const players: string[] = JSON.parse(gameData.players || "[]");
+        const symbols: Record<string, string> = JSON.parse(
+          gameData.symbols || "{}",
+        );
+        const board = JSON.parse(gameData.board || "[]");
+
         state.status = "IN_GAME";
         state.game = {
-          matchId,
-          board: JSON.parse(gameData.board || "[]"),
+          matchId: gameData.matchId,
+          players,
+          board,
           turn: gameData.turn,
-          mySymbol: JSON.parse(gameData.symbols || "{}")[userId],
-          version: gameData.version
+          mySymbol: symbols[userId],
+          status: gameData.status,
+          version: Number(gameData.version || 0),
+          expiresAt: Number(gameData.expiresAt),
         };
       } else {
-        // Self-heal: mapping exists but match is gone
+        // 🔥 Self-heal: dangling index
         await redis.del(`player:match_map:${userId}`);
+        await redis.hset(`presence:${userId}`, "status", "IDLE");
         state.status = "IDLE";
       }
     }
@@ -88,28 +101,33 @@ export const gatewayService = {
   /**
    * PRIVATE CHAT: Uses match_map for zero-trust security
    */
-  async handlePrivateChat(senderId: string, recipientId: string, matchId: string, text: string) {
-    
-    // 1. SECURITY: Check the match mapping for BOTH users
-    // This is the most efficient check: O(1) string lookups
+  async handlePrivateChat(
+    senderId: string,
+    recipientId: string,
+    matchId: string,
+    text: string,
+  ) {
     const [senderMatch, recipientMatch] = await Promise.all([
       redis.get(`player:match_map:${senderId}`),
-      redis.get(`player:match_map:${recipientId}`)
+      redis.get(`player:match_map:${recipientId}`),
     ]);
 
-    // 2. VALIDATION:
-    // - Does the sender's actual match match the ID they sent?
-    // - Is the recipient in the SAME match?
     if (senderMatch !== matchId || recipientMatch !== matchId) {
-      console.warn(`[Chat] Security Block: ${senderId} attempted unauthorized chat in ${matchId}`);
+      console.warn(
+        `[Chat] Security Block: ${senderId} attempted unauthorized chat in ${matchId}`,
+      );
       return;
     }
 
-    // 3. TARGET LOOKUP: Find where the recipient is connected
-    const targetInstanceId = await redis.hget(`presence:${recipientId}`, "instanceId");
+    const targetInstanceId = await redis.hget(
+      `presence:${recipientId}`,
+      "instanceId",
+    );
 
     if (!targetInstanceId) {
-      console.log(`[Chat] Recipient ${recipientId} is offline. Message dropped.`);
+      console.log(
+        `[Chat] Recipient ${recipientId} is offline. Message dropped.`,
+      );
       return;
     }
 
@@ -121,5 +139,5 @@ export const gatewayService = {
       text,
       sentAt: new Date().toISOString(),
     });
-  }
+  },
 };

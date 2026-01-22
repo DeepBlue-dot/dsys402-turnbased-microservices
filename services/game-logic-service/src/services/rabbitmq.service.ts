@@ -27,7 +27,7 @@ export const initRabbit = async () => {
         durable: true,
       });
 
-      for (const key of config.eventsExchange) {
+      for (const key of config.routingKeys) {
         await channel.bindQueue(
           config.gameLogicQueue,
           config.eventsExchange,

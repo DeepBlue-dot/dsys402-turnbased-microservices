@@ -75,7 +75,8 @@ async function findPartner(id: string, rating: number, range: number): Promise<{
 
 /**
  * Handles pairing with an atomic lock and fallback rollback
- */async function createMatch(p1: string, p2: string, r1: number, r2: number) {
+ */
+async function createMatch(p1: string, p2: string, r1: number, r2: number) {
   // 1. ATOMIC LOCK: Remove both players from the Sorted Set queue
   // If this returns < 2, another worker instance already matched one of these players
   const removedCount = await redis.zrem(QUEUE_KEY, p1, p2);
@@ -125,6 +126,12 @@ async function findPartner(id: string, rating: number, range: number): Promise<{
         mode: "ranked"
       });
     }
+
+    await publishEvent(`match.created`, {
+        matchId,
+        players: [p1, p2],
+        mode: "ranked"
+      });
 
     console.log(`[Matchmaker] Success: ${matchId} | Instances: ${instance1}, ${instance2}`);
 

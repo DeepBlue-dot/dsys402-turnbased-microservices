@@ -36,7 +36,10 @@ export const startWSServer = (server: http.Server) => {
       const payload = authenticateWS(token || undefined);
       const userId = payload.userId;
 
+      const sessionId = crypto.randomUUID();
+
       socket.userId = userId;
+      socket.sessionId = sessionId; // 🔑 Store it
       socket.isAlive = true;
       userSockets.set(userId, socket);
 
@@ -45,7 +48,15 @@ export const startWSServer = (server: http.Server) => {
         await gatewayService.handleHeartbeat(userId);
       });
 
-      await gatewayService.handleConnect(userId);
+      await gatewayService.handleConnect(userId, sessionId);
+
+      const currentState = await gatewayService.handleSyncRequest(userId);
+      socket.send(
+        JSON.stringify({
+          type: "CONNECT_SYNC",
+          data: currentState,
+        }),
+      );
 
       socket.on("message", async (data) => {
         try {
@@ -112,13 +123,18 @@ export const startWSServer = (server: http.Server) => {
     }
   });
 };
-
 export const sendToUser = (userId: string, payload: any) => {
   const socket = userSockets.get(userId);
 
   if (socket && socket.readyState === 1) {
-    // 1 = OPEN
-    socket.send(JSON.stringify(payload));
+    // Add timestamp to payload
+    const payloadWithTimestamp = {
+      ...payload,
+      timestamp: new Date().toISOString(),
+      // or use milliseconds: Date.now()
+    };
+    
+    socket.send(JSON.stringify(payloadWithTimestamp));
     return true;
   }
 

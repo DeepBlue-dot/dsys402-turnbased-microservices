@@ -10,7 +10,7 @@ router.put("/me/email", authMiddleware, updateMyEmail);
 router.put("/me/password", authMiddleware, updateMyPassword);
 router.delete("/me", authMiddleware, deleteMyAccount);
 
-router.get("/", searchPlayers);
+router.get("/search", searchPlayers);
 router.get("/:id/profile", getPublicProfile);
 router.get("/:id/stats", getPublicStats);
 

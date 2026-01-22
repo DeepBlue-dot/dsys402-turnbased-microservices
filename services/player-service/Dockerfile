@@ -19,4 +19,4 @@ COPY . .
 RUN npm run build
 
 # 🔥 RUN MIGRATIONS AT CONTAINER START
-CMD sh -c "npx prisma migrate deploy && npm start"
+CMD sh -c "npx prisma db push && npm start"

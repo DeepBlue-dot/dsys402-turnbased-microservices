@@ -130,7 +130,7 @@ const handlePlayerDisconnected = async (payload: { userId: string }) => {
     // 2. Persist "Last Seen" to PostgreSQL
     await prisma.player.update({
       where: { id: userId },
-      data: { updatedAt: new Date() },
+      data: { lastOnline: new Date() },
     });
 
     console.log(`[Presence] ${userId} disconnected and archived`);

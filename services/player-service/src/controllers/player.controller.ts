@@ -3,6 +3,7 @@ import { prisma } from "../config/prisma.js";
 import bcrypt from "bcryptjs";
 import { AuthRequest } from "../types/types.js";
 import * as schema from "../validators/player.validator.js";
+import { redis } from "../config/redis.js";
 
 /**
  * Higher-order function to catch async errors and pass them to global error handler
@@ -27,18 +28,35 @@ const formatPlayer = (player: any) => ({
     draws: player.stats.draws,
   } : null,
   createdAt: player.createdAt,
+  updateAt: player.updateAt,
+  lastOnline: player.lastOnline,
 });
 
 // GET /me
 export const getMyData = catchAsync(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+
   const user = await prisma.player.findUnique({
-    where: { id: req.userId },
+    where: { id: userId },
     include: { profile: true, stats: true },
   });
 
-  if (!user) return res.status(404).json({ error: "User not found" });
-  res.json(formatPlayer(user));
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  // 🔑 Fetch live status from Redis
+  const presenceKey = `presence:${userId}`;
+  const presence = await redis.hgetall(presenceKey);
+
+  const status = presence?.status ?? "OFFLINE";
+
+  res.json({
+    ...formatPlayer(user),
+    status, // 👈 LIVE status from Redis
+  });
 });
+
 
 // PUT /me/profile
 export const updateMyProfile = catchAsync(async (req: AuthRequest, res: Response) => {

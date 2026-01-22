@@ -7,15 +7,13 @@ const JOIN_TIMES_KEY = "match:join_times";
 export const joinMatchmaking = async (userId: string) => {
   const presenceKey = `presence:${userId}`;
 
-  // 1. Fetch live presence data
+  // 1. Fetch live presence data (including instanceId for targeted routing)
   const playerData = await redis.hgetall(presenceKey);
 
-  // If the hash is empty, the player has no active connection (Gateway/Janitor deleted it)
   if (!playerData || Object.keys(playerData).length === 0) {
     throw new Error("Presence not found. Please ensure your game is connected.");
   }
 
-  // 2. Validate current status
   if (playerData.status === "QUEUED") {
     throw new Error("You are already searching for a match.");
   }
@@ -25,49 +23,62 @@ export const joinMatchmaking = async (userId: string) => {
   }
 
   const rating = parseInt(playerData.rating || "1000");
+  const instanceId = playerData.instanceId; // 🔑 Found the Gateway location
 
-  // 3. ATOMIC PIPELINE: Update Status, Add to Queue, and Set Join Time
+  // 2. ATOMIC PIPELINE: Update Redis State
   await redis.pipeline()
     .hset(presenceKey, "status", "QUEUED")
     .zadd(QUEUE_KEY, rating, userId)
     .hset(JOIN_TIMES_KEY, userId, Date.now().toString())
     .exec();
 
-  // 4. Notify the system
-  await publishEvent("matchmaking.joined", {
-    userId,
-    rating,
-    queue: "ranked",
-  });
+  // 3. TARGETED PUBLISH: Only the specific Gateway instance notifies the player
+  if (instanceId) {
+    await publishEvent(`matchmaking.joined.${instanceId}`, {
+      userId,
+      rating,
+      queue: "ranked",
+    });
+  }
 
-  console.log(`[Matchmaking] Player ${userId} joined queue (ELO: ${rating})`);
+  console.log(`[Matchmaking] Player ${userId} joined queue on ${instanceId}`);
   return { message: "Joined queue", rating };
 };
 
 export const leaveQueue = async (userId: string) => {
   const presenceKey = `presence:${userId}`;
 
-  // Check if they are actually in the queue before resetting status
-  const currentStatus = await redis.hget(presenceKey, "status");
+  // Fetch presence to get status and instanceId
+  const playerData = await redis.hgetall(presenceKey);
+
+  if (!playerData || Object.keys(playerData).length === 0) {
+    console.warn(`[Matchmaking] Player ${userId} is offline, cannot leave queue.`);
+    return { message: "Player offline" };
+  }
+
+  const currentStatus = playerData.status;
+  const instanceId = playerData.instanceId;
+
+  if (currentStatus !== "QUEUED") {
+    console.warn(`[Matchmaking] Player ${userId} is not in queue.`);
+    return { message: "Player not in queue" };
+  }
 
   // 1. ATOMIC PIPELINE: Cleanup Matchmaking Data
   const pipeline = redis.pipeline();
   pipeline.zrem(QUEUE_KEY, userId);
   pipeline.hdel(JOIN_TIMES_KEY, userId);
-
-
-  if (currentStatus === "QUEUED") {
-    pipeline.hset(presenceKey, "status", "IDLE");
-  }
-
+  pipeline.hset(presenceKey, "status", "IDLE"); // Set back to idle
   await pipeline.exec();
 
-  // 2. Notify the system
-  await publishEvent("matchmaking.left", {
-    userId,
-    queue: "ranked",
-  });
+  // 2. TARGETED PUBLISH: Notify the specific Gateway to update the player's UI
+  if (instanceId) {
+    await publishEvent(`matchmaking.left.${instanceId}`, {
+      userId,
+      queue: "ranked",
+    });
+  }
 
-  console.log(`[Matchmaking] Player ${userId} left queue`);
+  console.log(`[Matchmaking] Player ${userId} left queue from ${instanceId}`);
   return { message: "Left queue" };
 };

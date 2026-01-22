@@ -37,7 +37,7 @@ export const config = {
   eventsExchange: "events",
   
   // Private queue for this specific instance to receive commands
-  gameLogicQueue: `logic.queue.${instanceId}`,
+  gameLogicQueue: `logic.queue`,
 
   // The events this service needs to react to
   routingKeys: [
@@ -45,15 +45,13 @@ export const config = {
     "game.cmd.move",        // Player requesting a move
     "game.cmd.forfeit",     // Player surrendering
     "player.disconnected",  // To start reconnection grace timer
-    "player.connected"      // To cancel grace timer
   ],
 
   // 🛡️ Security
   jwtSecret: required("JWT_SECRET"),
 
   // ⏳ Game Rules (Tunables)
-  turnTimeoutSec: Number(process.env.TURN_TIMEOUT_SEC) || 30,
-  reconnectWindowSec: Number(process.env.RECONNECT_WINDOW_SEC) || 60,
+  turnTimeoutSec: Number(process.env.TURN_TIMEOUT_SEC) || 70,
   
   // 🧹 Janitor Tuning
   watchdogIntervalMs: 2000, // Check for timed-out matches every 2 seconds

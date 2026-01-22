@@ -41,6 +41,14 @@ export const handleEvents = async (event: {
       await handleMatchEnded(event.data);
       break;
 
+    case "matchmaking.joined":
+      sendToUser(event.data.userId, { type: "QUEUE_JOINED", data: event.data });
+      break;
+
+    case "matchmaking.left":
+      sendToUser(event.data.userId, { type: "QUEUE_LEFT", data: event.data });
+      break;
+
     default:
       break;
   }
@@ -127,16 +135,29 @@ const handleMatchFailed = async (payload: {
  * 🔄 SHARED/INFRASTRUCTURE HANDLERS
  */
 
-const handlePlayerKick = async (payload: { userId: string }) => {
+const handlePlayerKick = async (payload: {
+  userId: string;
+  sessionId: string;
+}) => {
   const localSocket = userSockets.get(payload.userId);
-  if (localSocket) {
+
+  // 🔑 ONLY kick if a socket exists AND it's not the one that triggered the kick
+  if (localSocket && localSocket.sessionId !== payload.sessionId) {
     localSocket.wasKicked = true;
-    localSocket.send(JSON.stringify({
-      type: "ERROR",
-      message: "You have been logged in from another device.",
-    }));
+
+    console.log(`[WS] Kicking OLD session for ${payload.userId}`);
+
+    localSocket.send(
+      JSON.stringify({
+        type: "ERROR",
+        message: "You have been logged in from another device.",
+      }),
+    );
+
     localSocket.terminate();
     userSockets.delete(payload.userId);
+  } else if (localSocket && localSocket.sessionId === payload.sessionId) {
+    console.log(`[WS] Ignoring kick for CURRENT session ${payload.userId}`);
   }
 };
 
@@ -159,7 +180,7 @@ const handleMatchCreated = async (payload: {
   players: string[];
   mode: string;
 }) => {
-  // match.created is usually the first event. We check all players 
+  // match.created is usually the first event. We check all players
   // and notify those who are physically on THIS instance.
   payload.players.forEach((userId) => {
     if (userSockets.has(userId)) {
