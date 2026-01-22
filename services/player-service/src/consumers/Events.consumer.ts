@@ -49,7 +49,7 @@ export const handleEvents = async (event: {
       await handlePlayerHeartbeat(event.data);
       break;
 
-    case "game.ended":
+    case "match.ended":
       await handleMatchEnded(event.data);
       break;
 

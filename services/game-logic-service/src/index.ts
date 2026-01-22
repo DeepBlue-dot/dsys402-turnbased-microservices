@@ -1,3 +1,3 @@
-import { start } from "./app.js";
+import startApp from "./app.js";
 
-start().catch(console.error);
+startApp().catch(console.error);

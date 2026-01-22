@@ -1,21 +1,27 @@
-import { initRabbit } from "./services/rabbitmq.service.js";
-import { connectMongo } from "./db/mongo.js";
-import { startMatchCreatedConsumer } from "./consumers/matchCreated.consumer.js";
-import { startPlayerMoveConsumer } from "./consumers/playerMove.consumer.js";
-import { startPauseTimeoutWatcher } from "./engine/pause-timeout.js";
-import { startPlayerEventsConsumer } from "./consumers/player-events.consumer.js";
-import { startGameControlConsumer } from "./consumers/game-control.consumer.js";
+import express from "express";
+import historyRoutes from "./routes/MatchHistory.routes.js";
+import { config } from "./config/env.js";
+import { initRabbit, consumeEvents } from "./services/rabbitmq.service.js";
+import { handleEvents } from "./consumers/Event.consumer.js";
+import { startWatchdog } from "./worker/watchdog.worker.js";
+import { connectMongo } from "./config/mongo.js";
 
-export const start = async () => {
-  await connectMongo();
+const app = express();
+app.use(express.json());
+app.use("/", historyRoutes);
+
+const startApp = async () => {
   await initRabbit();
+  await consumeEvents(config.gameLogicQueue, handleEvents);
+  await startWatchdog();
 
-  await startPauseTimeoutWatcher();
-  await startPlayerEventsConsumer();
-  await startMatchCreatedConsumer();
-  await startPlayerMoveConsumer();
-  await startGameControlConsumer();
+  await connectMongo();
 
-  console.log("[GameLogic] Service started");
+  app.listen(config.port, () => {
+    console.log(`[Matchmaking] Running on ${config.port}`);
+  });
+
+  console.log("[MatchmakingService] Event consumers started");
 };
 
+export default startApp;

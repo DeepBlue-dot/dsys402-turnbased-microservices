@@ -27,7 +27,7 @@ export const config = {
     "player.connected",
     "player.disconnected",
     "player.heartbeat",
-    "game.ended",
+    "match.ended",
   ] as const,
 
   // Auth

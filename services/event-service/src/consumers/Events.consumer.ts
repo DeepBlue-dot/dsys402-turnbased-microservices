@@ -20,9 +20,25 @@ export const handleEvents = async (event: {
     case "match.created":
       await handleMatchCreated(event.data);
       break;
-      
+
+    case "game.event.started":
+      await handleGameStarted(event.data);
+      break;
+
+    case "game.event.turn":
+      await handleGameTurn(event.data);
+      break;
+
+    case "game.event.invalid":
+      await handleInvalidMove(event.data);
+      break;
+
     case "match.failed":
       await handleMatchFailed(event.data);
+      break;
+
+    case "match.ended":
+      await handleMatchEnded(event.data);
       break;
 
     default:
@@ -30,33 +46,95 @@ export const handleEvents = async (event: {
   }
 };
 
+/**
+ * Strips the .gateway-instance-id from the RabbitMQ routing key
+ */
 const normalizeEventType = (type: string): string => {
   const suffix = `.${config.instanceId}`;
-
-  if (type.endsWith(suffix)) {
-    return type.slice(0, -suffix.length);
-  }
-
-  return type;
+  return type.endsWith(suffix) ? type.slice(0, -suffix.length) : type;
 };
+
+/**
+ * 🎯 PER-PLAYER HANDLERS
+ * No more loops. We target the specific recipientId provided by the Game Logic.
+ */
+
+const handleGameStarted = async (payload: {
+  recipientId: string;
+  matchId: string;
+  mySymbol: string;
+  opponentId: string;
+  turn: string;
+  expiresAt: number;
+}) => {
+  sendToUser(payload.recipientId, {
+    type: "GAME_STARTED",
+    data: payload,
+  });
+};
+
+const handleGameTurn = async (payload: {
+  recipientId: string;
+  matchId: string;
+  board: string[];
+  nextTurn: string;
+  isMyTurn: boolean;
+  expiresAt: number;
+}) => {
+  sendToUser(payload.recipientId, {
+    type: "GAME_TURN",
+    data: payload,
+  });
+};
+
+const handleMatchEnded = async (payload: {
+  recipientId: string;
+  matchId: string;
+  result: "WIN" | "LOSS" | "DRAW";
+  reason: string;
+  finalBoard: string[];
+}) => {
+  sendToUser(payload.recipientId, {
+    type: "GAME_OVER",
+    data: payload,
+  });
+};
+
+const handleInvalidMove = async (payload: {
+  recipientId: string;
+  matchId: string;
+  reason: string;
+}) => {
+  sendToUser(payload.recipientId, {
+    type: "INVALID_MOVE",
+    data: payload,
+  });
+};
+
+const handleMatchFailed = async (payload: {
+  recipientId: string;
+  matchId: string;
+  reason: string;
+}) => {
+  // If the game failed to start, tell the specific player
+  sendToUser(payload.recipientId, {
+    type: "MATCH_ERROR",
+    data: { reason: payload.reason },
+  });
+};
+
+/**
+ * 🔄 SHARED/INFRASTRUCTURE HANDLERS
+ */
 
 const handlePlayerKick = async (payload: { userId: string }) => {
   const localSocket = userSockets.get(payload.userId);
-
   if (localSocket) {
     localSocket.wasKicked = true;
-
-    console.log(
-      `[WS] Kicking local session for ${payload.userId} (new login detected)`,
-    );
-
-    localSocket.send(
-      JSON.stringify({
-        type: "ERROR",
-        message: "You have been logged in from another device.",
-      }),
-    );
-
+    localSocket.send(JSON.stringify({
+      type: "ERROR",
+      message: "You have been logged in from another device.",
+    }));
     localSocket.terminate();
     userSockets.delete(payload.userId);
   }
@@ -69,14 +147,10 @@ const handlePrivateChat = async (payload: {
   matchId: string;
   sentAt: string;
 }) => {
+  // Recipient check is handled by RabbitMQ routing, but we verify local existence
   sendToUser(payload.to, {
     type: "CHAT_MESSAGE",
-    data: {
-      from: payload.from,
-      text: payload.text,
-      matchId: payload.matchId,
-      sentAt: payload.sentAt,
-    },
+    data: payload,
   });
 };
 
@@ -85,39 +159,18 @@ const handleMatchCreated = async (payload: {
   players: string[];
   mode: string;
 }) => {
+  // match.created is usually the first event. We check all players 
+  // and notify those who are physically on THIS instance.
   payload.players.forEach((userId) => {
     if (userSockets.has(userId)) {
-      const opponentId = payload.players.find((id) => id !== userId);
-
       sendToUser(userId, {
         type: "MATCH_CREATED",
         data: {
           matchId: payload.matchId,
-          opponentId,
+          opponentId: payload.players.find((id) => id !== userId),
           mode: payload.mode,
         },
       });
-
-      console.log(
-        `[WS:Push] Notified local user ${userId} of match ${payload.matchId}`,
-      );
     }
-  });
-};
-
-const handleMatchFailed = async (payload: {
-  matchId: string;
-  players: string[];
-  reason: string;
-}) => {
-  payload.players.forEach((userId) => {
-    // We only notify users connected to THIS gateway instance
-    sendToUser(userId, {
-      type: "MATCH_ERROR",
-      data: {
-        reason: "Game failed to start. Returning to lobby...",
-        code: payload.reason,
-      },
-    });
   });
 };

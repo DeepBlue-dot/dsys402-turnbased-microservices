@@ -1,77 +1,81 @@
 import amqp from "amqplib";
 import { config } from "../config/env.js";
+import { Event } from "../types/types.js";
 
 let channel: amqp.Channel | null = null;
 
-/* -------------------- helpers -------------------- */
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const assertChannel = (): amqp.Channel => {
-  if (!channel) {
-    throw new Error("RabbitMQ channel not initialized");
-  }
+  if (!channel) throw new Error("RabbitMQ channel not initialized");
   return channel;
 };
-
-/* -------------------- init -------------------- */
 
 export const initRabbit = async () => {
   while (!channel) {
     try {
-      console.log("[GameLogic] Connecting to RabbitMQ...");
+      console.log("[Matchmaking] Connecting to RabbitMQ...");
 
       const connection = await amqp.connect(config.rabbitmqUrl);
       channel = await connection.createChannel();
 
-      await channel.assertQueue(config.matchCreatedQueue, { durable: true });
-      await channel.assertQueue(config.playerMoveQueue, { durable: true });
-      await channel.assertQueue(config.playerEventsQueue, { durable: true });
-      await channel.assertQueue(config.gameEventsQueue, { durable: true });
+      await channel.assertExchange(config.eventsExchange, "topic", {
+        durable: true,
+      });
 
-      console.log("[GameLogic] RabbitMQ connected");
+      await channel.assertQueue(config.gameLogicQueue, {
+        durable: true,
+      });
+
+      for (const key of config.eventsExchange) {
+        await channel.bindQueue(
+          config.gameLogicQueue,
+          config.eventsExchange,
+          key,
+        );
+      }
+
+      console.log("[Matchmaking] RabbitMQ connected");
     } catch (err) {
-      console.error("[GameLogic] RabbitMQ not ready, retrying...");
+      console.error("[Matchmaking] RabbitMQ not ready, retrying...");
       await wait(5000);
     }
   }
 };
 
-/* -------------------- publish -------------------- */
-
-export const publish = async (queue: string, event: any) => {
+export const consumeEvents = async (queue: string, handler: (event: Event) => Promise<void>) => {
   const ch = assertChannel();
-
-  ch.sendToQueue(queue, Buffer.from(JSON.stringify(event)), {
-    persistent: true,
-  });
-
-  console.log(`[GAME EVENT] ${queue} :`, event);
-};
-
-/* -------------------- consume -------------------- */
-
-export const consume = async (
-  queue: string,
-  handler: (data: any) => Promise<void>
-) => {
-  const ch = assertChannel();
-
-  console.log(`[GameLogic] Waiting for messages on ${queue}`);
 
   await ch.consume(queue, async (msg) => {
     if (!msg) return;
 
-    const data = JSON.parse(msg.content.toString());
-    console.log(`[GAME EVENT] ${queue} :`, data);
-
     try {
-      await handler(data);
+      const event = JSON.parse(msg.content.toString());
+      await handler(event);
       ch.ack(msg);
     } catch (err) {
-      console.error("[GameLogic] Handler error:", err);
-      // discard bad message (no requeue)
+      console.error("[Matchmaking] Event handling failed", err);
       ch.nack(msg, false, false);
     }
   });
 };
+
+export const publishEvent = async (routingKey: string, payload: any) => {
+  const ch = assertChannel();
+
+  const event = {
+    type: routingKey,
+    data: payload,
+    occurredAt: new Date().toISOString(),
+  };
+
+  ch.publish(
+    config.eventsExchange,
+    routingKey,
+    Buffer.from(JSON.stringify(event)),
+    { persistent: true }
+  );
+
+  console.log(`[EVENT] ${routingKey}`, payload);
+};
+

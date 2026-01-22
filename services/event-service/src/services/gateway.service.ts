@@ -2,6 +2,9 @@ import { config } from "../config/env.js";
 import { redis } from "../config/redis.js";
 import { publishEvent } from "./rabbitmq.service.js";
 
+const QUEUE_KEY = "match:queue:ranked";
+const JOIN_TIMES_KEY = "match:join_times";
+
 export const gatewayService = {
   async handleConnect(userId: string) {
     await publishEvent("player.kick", { userId });
@@ -21,95 +24,96 @@ export const gatewayService = {
   },
 
   async handleGameMove(userId: string, matchId: string, move: string) {
-    await publishEvent("game.move", { userId, matchId, move });
+    await publishEvent("game.cmd.move", { userId, matchId, move });
   },
 
   async handleGameForfeit(userId: string, matchId: string) {
-    await publishEvent("game.feit", { userId, matchId });
+    await publishEvent("game.cmd.feit", { userId, matchId });
   },
 
   async handleSyncRequest(userId: string) {
     const presenceKey = `presence:${userId}`;
-    const QUEUE_KEY = "match:queue:ranked";
-    const JOIN_TIMES_KEY = "match:join_times";
 
-    // 1. Fetch all state data in parallel for high performance
-    const [presence, queueRank, joinTime] = await Promise.all([
+    // 1. Fetch presence and match mapping in parallel
+    const [presence, matchId, queueRank, joinTime] = await Promise.all([
       redis.hgetall(presenceKey),
-      redis.zrank(QUEUE_KEY, userId), // Returns the 0-based position in queue
-      redis.hget(JOIN_TIMES_KEY, userId), // Returns the timestamp they joined
+      redis.get(`player:match_map:${userId}`), // Direct index lookup
+      redis.zrank(QUEUE_KEY, userId),
+      redis.hget(JOIN_TIMES_KEY, userId)
     ]);
 
-    // Scenario A: User has no presence key (Offline)
     if (!presence || Object.keys(presence).length === 0) {
-      return {
-        status: "OFFLINE",
-        msg: "No active session found.",
-      };
+      return { status: "OFFLINE" };
     }
 
-    // 2. Build the Base State
     const state: any = {
       status: presence.status,
       userId: presence.userId,
       rating: parseInt(presence.rating || "1000"),
     };
 
-    // Scenario B: User is in the Matchmaking Queue
+    // --- Scenario: QUEUED ---
     if (presence.status === "QUEUED" || queueRank !== null) {
-      state.status = "QUEUED"; // Force sync if there was a status mismatch
+      state.status = "QUEUED";
       state.queue = {
         position: queueRank !== null ? queueRank + 1 : null,
-        joinedAt: joinTime ? new Date(parseInt(joinTime)).toISOString() : null,
-        waitTimeSeconds: joinTime
-          ? Math.floor((Date.now() - parseInt(joinTime)) / 1000)
-          : 0,
+        waitTimeSeconds: joinTime ? Math.floor((Date.now() - parseInt(joinTime)) / 1000) : 0,
       };
     }
 
-    // Scenario C: User is in an active game
-    if (presence.status === "IN_GAME") {
+    // --- Scenario: IN_GAME ---
+    // If the index (match_map) exists, the player is officially in a match
+    if (matchId) {
+      const gameData = await redis.hgetall(`game:match:${matchId}`);
+
+      if (gameData && Object.keys(gameData).length > 0) {
+        state.status = "IN_GAME";
+        state.game = {
+          matchId,
+          board: JSON.parse(gameData.board || "[]"),
+          turn: gameData.turn,
+          mySymbol: JSON.parse(gameData.symbols || "{}")[userId],
+          version: gameData.version
+        };
+      } else {
+        // Self-heal: mapping exists but match is gone
+        await redis.del(`player:match_map:${userId}`);
+        state.status = "IDLE";
+      }
     }
 
     return state;
   },
 
-  async handlePrivateChat(
-    senderId: string,
-    recipientId: string,
-    matchId: string,
-    text: string,
-  ) {
-    // 1. SECURITY: Verify both users are actually in the same match
-    // This prevents users from "sniffing" IDs and messaging random players
-    const [isSenderIn, isRecipientIn] = await Promise.all([
-      redis.sismember(`match:participants:${matchId}`, senderId),
-      redis.sismember(`match:participants:${matchId}`, recipientId),
+  /**
+   * PRIVATE CHAT: Uses match_map for zero-trust security
+   */
+  async handlePrivateChat(senderId: string, recipientId: string, matchId: string, text: string) {
+    
+    // 1. SECURITY: Check the match mapping for BOTH users
+    // This is the most efficient check: O(1) string lookups
+    const [senderMatch, recipientMatch] = await Promise.all([
+      redis.get(`player:match_map:${senderId}`),
+      redis.get(`player:match_map:${recipientId}`)
     ]);
 
-    if (!isSenderIn || !isRecipientIn) {
-      console.warn(
-        `[Chat] Security Alert: ${senderId} tried to message ${recipientId} outside of match ${matchId}`,
-      );
+    // 2. VALIDATION:
+    // - Does the sender's actual match match the ID they sent?
+    // - Is the recipient in the SAME match?
+    if (senderMatch !== matchId || recipientMatch !== matchId) {
+      console.warn(`[Chat] Security Block: ${senderId} attempted unauthorized chat in ${matchId}`);
       return;
     }
 
-    // 2. LOCATION LOOKUP: Pull the target instanceId from the presence hash
-    // This is the new consolidated structure
-    const targetInstanceId = await redis.hget(
-      `presence:${recipientId}`,
-      "instanceId",
-    );
+    // 3. TARGET LOOKUP: Find where the recipient is connected
+    const targetInstanceId = await redis.hget(`presence:${recipientId}`, "instanceId");
 
     if (!targetInstanceId) {
-      console.warn(
-        `[Chat] Recipient ${recipientId} is offline or presence expired. Message dropped.`,
-      );
+      console.log(`[Chat] Recipient ${recipientId} is offline. Message dropped.`);
       return;
     }
 
-    // 3. TARGETED PUBLISH: Direct the event to the specific Gateway instance
-    // The Routing Key will be e.g., "chat.private.gateway-01"
+    // 4. DIRECTED RELAY
     await publishEvent(`chat.private.${targetInstanceId}`, {
       from: senderId,
       to: recipientId,
@@ -117,9 +121,5 @@ export const gatewayService = {
       text,
       sentAt: new Date().toISOString(),
     });
-
-    console.log(
-      `[Chat] Message relayed from ${senderId} to ${recipientId} on ${targetInstanceId}`,
-    );
-  },
+  }
 };
