@@ -17,7 +17,7 @@ export const config = {
   gatewayQueue: `gateway.queue.${instanceId}`,
 
   gatewayRoutingKeys: [
-    "match.strarted", 
+    "match.created", 
     "player.kick",
     "chat.private"
   ],

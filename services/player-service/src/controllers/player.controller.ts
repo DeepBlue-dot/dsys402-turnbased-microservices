@@ -93,9 +93,6 @@ export const updateMyPassword = catchAsync(async (req: AuthRequest, res: Respons
       where: { id: req.userId },
       data: { password: hashed },
     }),
-    prisma.session.deleteMany({
-      where: { playerId: req.userId }
-    })
   ]);
 
   res.json({ message: "Password updated and all sessions cleared. Please log in again." });

@@ -44,7 +44,7 @@ export const handleEvents = async (event: { type: string; data: any, occurredAt:
       await handlePlayerHeartbeat(event.data);
       break;
 
-    case "match.ended":
+    case "game.ended":
       await handleMatchEnded(event.data);
       break;
 
@@ -94,7 +94,6 @@ const handlePlayerConnected = async (payload: PlayerConnectedPayload) => {
 
     pipeline.hset(key, {
       userId,
-      username: player.profile?.username,
       rating: player.stats?.rating?.toString() || "0",
       status: statusToSet, // <--- PRESERVE STATE
       missedHeartbeats: "0",
