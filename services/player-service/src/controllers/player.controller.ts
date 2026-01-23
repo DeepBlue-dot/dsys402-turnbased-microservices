@@ -70,6 +70,7 @@ export const getMyData = catchAsync(async (req: AuthRequest, res: Response) => {
     stats: user.stats,
     rating: user.stats?.rating || 1000,
     status: presence?.status ?? "OFFLINE",
+    lastOnline: user.lastOnline, 
   };
 
   // --- QUEUED ---
