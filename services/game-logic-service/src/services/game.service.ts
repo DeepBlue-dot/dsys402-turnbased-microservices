@@ -100,19 +100,51 @@ export const gameService = {
     const state = await redis.hgetall(key);
 
     // ❌ Invalid: match doesn't exist or not user's turn
+    if (
+      position === undefined ||
+      position === null ||
+      !Number.isInteger(position) ||
+      position < 0 ||
+      position > 8
+    ) {
+      const loc = await this.getPlayerLocation(userId);
+      if (loc) {
+        await publishEvent(`game.event.invalid.${loc.instanceId}`, {
+          recipientId: userId,
+          matchId,
+          reason: "INVALID_POSITION",
+        });
+      }
+      return;
+    }
+
+    // ❌ Invalid: match doesn't exist or not user's turn
     if (!state || Object.keys(state).length === 0 || state.turn !== userId) {
       const loc = await this.getPlayerLocation(userId);
       if (loc) {
         await publishEvent(`game.event.invalid.${loc.instanceId}`, {
           recipientId: userId,
           matchId,
-          reason: !state ? "MATCH_NOT_FOUND" : "NOT_YOUR_TURN",
+          reason:
+            !state || Object.keys(state).length === 0
+              ? "MATCH_NOT_FOUND"
+              : "NOT_YOUR_TURN",
         });
       }
       return;
     }
 
     const board: Board = JSON.parse(state.board);
+
+    console.log("[MOVE DEBUG]", {
+      matchId,
+      userId,
+      rawBoard: state.board,
+      parsedBoard: board,
+      position,
+      valueAtPosition: board[position],
+      valueType: typeof board[position],
+    });
 
     // ❌ Invalid: cell already taken
     if (board[position] !== "") {

@@ -1,5 +1,6 @@
 import { config } from "../config/env.js";
 import { redis } from "../config/redis.js";
+import { sendToUser } from "../ws/ws.server.js";
 import { publishEvent } from "./rabbitmq.service.js";
 
 const QUEUE_KEY = "match:queue:ranked";
@@ -23,12 +24,12 @@ export const gatewayService = {
     await publishEvent("player.disconnected", { userId });
   },
 
-  async handleGameMove(userId: string, matchId: string, move: string) {
-    await publishEvent("game.cmd.move", { userId, matchId, move });
+  async handleGameMove(userId: string, matchId: string, move: {position: string}) {
+    await publishEvent("game.cmd.move", { userId, matchId, position: move.position });
   },
 
   async handleGameForfeit(userId: string, matchId: string) {
-    await publishEvent("game.cmd.feit", { userId, matchId });
+    await publishEvent("game.cmd.forfeit", { userId, matchId });
   },
 
   async handleSyncRequest(userId: string) {
@@ -112,10 +113,15 @@ export const gatewayService = {
       redis.get(`player:match_map:${recipientId}`),
     ]);
 
+    // ❌ Security violation
     if (senderMatch !== matchId || recipientMatch !== matchId) {
-      console.warn(
-        `[Chat] Security Block: ${senderId} attempted unauthorized chat in ${matchId}`,
-      );
+      sendToUser(senderId, {
+        type: "chat.status",
+        status: "FAILED",
+        reason: "NOT_IN_SAME_MATCH",
+        matchId,
+        to: recipientId,
+      });
       return;
     }
 
@@ -124,20 +130,33 @@ export const gatewayService = {
       "instanceId",
     );
 
+    // ❌ Recipient offline
     if (!targetInstanceId) {
-      console.log(
-        `[Chat] Recipient ${recipientId} is offline. Message dropped.`,
-      );
+      sendToUser(senderId, {
+        type: "chat.status",
+        status: "FAILED",
+        reason: "RECIPIENT_OFFLINE",
+        matchId,
+        to: recipientId,
+      });
       return;
     }
 
-    // 4. DIRECTED RELAY
+    // ✅ Deliver message
     await publishEvent(`chat.private.${targetInstanceId}`, {
       from: senderId,
       to: recipientId,
       matchId,
       text,
       sentAt: new Date().toISOString(),
+    });
+
+    // ✅ Notify sender (out-of-band)
+    sendToUser(senderId, {
+      type: "chat.status",
+      status: "SENT",
+      matchId,
+      to: recipientId,
     });
   },
 };

@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from "uuid";
 
 const QUEUE_KEY = "match:queue:ranked";
 const JOIN_TIMES_KEY = "match:join_times";
-const USER_LOCATION_KEY = (userId: string) => `user:location:${userId}`;
 
 
 
