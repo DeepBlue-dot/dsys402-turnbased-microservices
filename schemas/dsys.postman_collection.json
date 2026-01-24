@@ -1,0 +1,1343 @@
+{
+  "info": {
+    "_postman_id": "ea9ac062-e5f2-4f94-8c56-6379fa0e8fa2",
+    "name": "dsys",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "48046841"
+  },
+  "item": [
+    {
+      "name": "Player A",
+      "item": [
+        {
+          "name": "player servies A",
+          "item": [
+            {
+              "name": "Register A",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"username\":\"Alice\",\"email\":\"alice@test.com\",\"password\":\"password123\"}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/register",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "register"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Login A",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "// Extract JWT from the response and save to environment\r",
+                      "const response = pm.response.json();\r",
+                      "if (response && response.token) {\r",
+                      "    pm.environment.set(\"player_a_token\", response.token);\r",
+                      "    console.log(\"Player A token set automatically:\", response.token);\r",
+                      "} else {\r",
+                      "    console.error(\"Login response did not contain token\");\r",
+                      "}\r",
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"email\": \"alice@test.com\",\r\n  \"password\": \"password123\"\r\n}\r\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/login",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Refresh Token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "// Extract JWT from the response and save to environment\r",
+                      "const response = pm.response.json();\r",
+                      "if (response && response.token) {\r",
+                      "    pm.environment.set(\"player_a_token\", response.token);\r",
+                      "    console.log(\"Player A token set automatically:\", response.token);\r",
+                      "} else {\r",
+                      "    console.error(\"Login response did not contain token\");\r",
+                      "}\r",
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"email\": \"alice@test.com\",\r\n  \"password\": \"password123\"\r\n}\r\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/refresh",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "refresh"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "LogOut",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const response = pm.response.json();\r",
+                      "if (response) {\r",
+                      "    pm.environment.set(\"player_a_token\", \"\");\r",
+                      "    console.log(\"Player A token set automatically:\", \"\");\r",
+                      "} else {\r",
+                      "    console.error(\"logout response did not contain token\");\r",
+                      "}\r",
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/auth/logout",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "logout"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "GetPlayerData",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const response = pm.response.json();\r",
+                      "\r",
+                      "if (!response) {\r",
+                      "    console.error(\"Response did not contain valid JSON\");\r",
+                      "    return;\r",
+                      "}\r",
+                      "\r",
+                      "// Store entire response as JSON string\r",
+                      "pm.environment.set(\"player_a_info\", JSON.stringify(response));\r",
+                      "console.log(\"Player A full info stored\");\r",
+                      "\r",
+                      "// Recursive function to flatten nested objects/arrays\r",
+                      "function flattenObject(obj, prefix = \"player_a\") {\r",
+                      "    for (const key in obj) {\r",
+                      "        if (!obj.hasOwnProperty(key)) continue;\r",
+                      "        const value = obj[key];\r",
+                      "        const envVarName = `${prefix}_${key}`;\r",
+                      "\r",
+                      "        if (value === null || value === undefined) {\r",
+                      "            pm.environment.set(envVarName, \"\");\r",
+                      "            console.log(`Set ${envVarName}: \"\"`);\r",
+                      "        } else if (typeof value === \"object\") {\r",
+                      "            if (Array.isArray(value)) {\r",
+                      "                // Store array as JSON string\r",
+                      "                pm.environment.set(envVarName, JSON.stringify(value));\r",
+                      "                console.log(`Set ${envVarName}: ${JSON.stringify(value)}`);\r",
+                      "            } else {\r",
+                      "                // Nested object → recurse\r",
+                      "                flattenObject(value, envVarName);\r",
+                      "            }\r",
+                      "        } else {\r",
+                      "            pm.environment.set(envVarName, String(value));\r",
+                      "            console.log(`Set ${envVarName}: ${value}`);\r",
+                      "        }\r",
+                      "    }\r",
+                      "}\r",
+                      "\r",
+                      "// Flatten all top-level and nested properties\r",
+                      "flattenObject(response);\r",
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/me",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "getPublicProfile",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/{{player_b_id}}/profile",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "{{player_b_id}}",
+                    "profile"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "getPublicStat",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/{{player_b_id}}/stats",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "{{player_b_id}}",
+                    "stats"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "searchPlayers",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/?search=b",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "b"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "updateMyProfile",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"username\": \"Alic new\",\r\n  \"avatarUrl\": \"https://example.com/avatar.jpg\",\r\n  \"bio\": \"Ready for new challenges! 🎮\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/player/me/profile",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me",
+                    "profile"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "updateMyEmail",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"email\": \"Alicnewemail@example.com\"\r\n}\r\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/player/me/email",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me",
+                    "email"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "updateMyPassword",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"oldPassword\": \"password123\",\r\n  \"newPassword\": \"newPassword123!\"\r\n}\r\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/player/me/password",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me",
+                    "password"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "deleteMyAccount",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/me",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{player_a_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "matchmaking A",
+          "item": [
+            {
+              "name": "join",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/matchmaking/join",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "matchmaking",
+                    "join"
+                  ]
+                },
+                "description": "Joins the authenticated player to the matchmaking queue.\n\nAuthentication\n- Requires a valid player access token (e.g., {{player_a_token}}) to be sent using the configured auth mechanism for this collection/environment.\n\nBehavior\n- Enqueues the current player into the matchmaking system so they can be paired with another player.\n- The server assigns or updates the player’s queue position and an estimated wait time.\n- Once a suitable opponent is found, the server creates/updates a game match for the player (e.g., matchId, players, board/turn state, status, version, and expiration time) which is then stored in environment variables like `player_a_game_*` or `player_b_game_*` for later requests in this workflow.\n\nTypical responses\n- 200 OK: Player successfully joined the matchmaking queue. The response usually includes queue information (position, waitTimeSeconds) and, when matched, current game state for the player.\n- 401/403 Unauthorized/Forbidden: The player token is missing, invalid, or expired.\n- 4xx: Validation or matchmaking-related errors (for example, the player cannot be queued or is already in an active match).\n\nNotes\n- This request is used as part of the Player A / Player B end-to-end matchmaking and gameplay tests in this collection.\n- No request body is required; all required context comes from authentication and environment variables (base_url, player tokens, etc.)."
+              },
+              "response": []
+            },
+            {
+              "name": "leave",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/matchmaking/leave",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "matchmaking",
+                    "leave"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{player_a_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Game history A",
+          "item": [
+            {
+              "name": "histoty",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/history/me",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "history",
+                    "me"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{player_a_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Player B",
+      "item": [
+        {
+          "name": "player servies B",
+          "item": [
+            {
+              "name": "Register B",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"username\": \"Bob\",\r\n  \"email\": \"Bob@test.com\",\r\n  \"password\": \"password123\"\r\n}\r\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/register",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "register"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Login B",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "// Extract JWT from the response and save to environment\r",
+                      "const response = pm.response.json();\r",
+                      "if (response && response.token) {\r",
+                      "    pm.environment.set(\"player_b_token\", response.token);\r",
+                      "    console.log(\"Player B token set automatically:\", response.token);\r",
+                      "} else {\r",
+                      "    console.error(\"Login response did not contain token\");\r",
+                      "}\r",
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"email\": \"Bob@test.com\",\r\n  \"password\": \"password123\"\r\n}\r\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/login",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Refresh Token Copy",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "// Extract JWT from the response and save to environment\r",
+                      "const response = pm.response.json();\r",
+                      "if (response && response.token) {\r",
+                      "    pm.environment.set(\"player_b_token\", response.token);\r",
+                      "    console.log(\"Player A token set automatically:\", response.token);\r",
+                      "} else {\r",
+                      "    console.error(\"Login response did not contain token\");\r",
+                      "}\r",
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"email\": \"alice@test.com\",\r\n  \"password\": \"password123\"\r\n}\r\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/auth/refresh",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "refresh"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "LogOut",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const response = pm.response.json();\r",
+                      "if (response) {\r",
+                      "    pm.environment.set(\"player_a_token\", \"\");\r",
+                      "    console.log(\"Player A token set automatically:\", \"\");\r",
+                      "} else {\r",
+                      "    console.error(\"logout response did not contain token\");\r",
+                      "}\r",
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/auth/logout",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "logout"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "GetPlayerData",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const response = pm.response.json();\r",
+                      "\r",
+                      "if (!response) {\r",
+                      "    console.error(\"Response did not contain valid JSON\");\r",
+                      "    return;\r",
+                      "}\r",
+                      "\r",
+                      "// Store entire response as JSON string\r",
+                      "pm.environment.set(\"player_b_info\", JSON.stringify(response));\r",
+                      "console.log(\"Player B full info stored\");\r",
+                      "\r",
+                      "// Recursive function to flatten nested objects/arrays\r",
+                      "function flattenObject(obj, prefix = \"player_b\") {\r",
+                      "    for (const key in obj) {\r",
+                      "        if (!obj.hasOwnProperty(key)) continue;\r",
+                      "        const value = obj[key];\r",
+                      "        const envVarName = `${prefix}_${key}`;\r",
+                      "\r",
+                      "        if (value === null || value === undefined) {\r",
+                      "            pm.environment.set(envVarName, \"\");\r",
+                      "            console.log(`Set ${envVarName}: \"\"`);\r",
+                      "        } else if (typeof value === \"object\") {\r",
+                      "            if (Array.isArray(value)) {\r",
+                      "                // Store array as JSON string\r",
+                      "                pm.environment.set(envVarName, JSON.stringify(value));\r",
+                      "                console.log(`Set ${envVarName}: ${JSON.stringify(value)}`);\r",
+                      "            } else {\r",
+                      "                // Nested object → recurse\r",
+                      "                flattenObject(value, envVarName);\r",
+                      "            }\r",
+                      "        } else {\r",
+                      "            pm.environment.set(envVarName, String(value));\r",
+                      "            console.log(`Set ${envVarName}: ${value}`);\r",
+                      "        }\r",
+                      "    }\r",
+                      "}\r",
+                      "\r",
+                      "// Flatten all top-level and nested properties\r",
+                      "flattenObject(response);\r",
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                },
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      ""
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/me",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "getPublicProfile Copy",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/{{player_a_id}}/profile",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "{{player_a_id}}",
+                    "profile"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "getPublicStat Copy",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/{{player_a_id}}/stats",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "{{player_a_id}}",
+                    "stats"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "searchPlayers Copy",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/?search=a",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "a"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "updateMyProfile Copy",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"username\": \"Bob new\",\r\n  \"avatarUrl\": \"https://example.com/avatar.jpg\",\r\n  \"bio\": \"Ready for new challenges! 🎮\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/player/me/profile",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me",
+                    "profile"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "updateMyEmail Copy",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"email\": \"BoBnewemail@example.com\"\r\n}\r\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/player/me/email",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me",
+                    "email"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "updateMyPassword Copy",
+              "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"oldPassword\": \"password123\",\r\n  \"newPassword\": \"newPassword123!\"\r\n}\r\n",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/player/me/email",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me",
+                    "email"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "deleteMyAccount Copy",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc2NTk3ODA0NiwiZXhwIjoxNzY2MDY0NDQ2fQ.hKizHQEv4ZrLhfqyWn3mI7qX1H6xvRMkGtefRp72l0A",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/player/me",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "player",
+                    "me"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{player_b_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "matchmaking B",
+          "item": [
+            {
+              "name": "join",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/matchmaking/join",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "matchmaking",
+                    "join"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "leave",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/matchmaking/leave",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "matchmaking",
+                    "leave"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{player_b_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Game history B",
+          "item": [
+            {
+              "name": "histoty",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/history/me",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "history",
+                    "me"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{player_b_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {},
+                "exec": [
+                  ""
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

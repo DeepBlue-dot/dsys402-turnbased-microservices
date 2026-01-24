@@ -1,5 +1,17 @@
-import { z } from "zod";
+import { z, ZodType  } from "zod";
+import { Request, Response, NextFunction } from "express";
 
+export const validate =
+  <T>(schema: ZodType<T>) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      req.body = schema.parse(req.body);
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+  
 export const updateProfileSchema = z.object({
   username: z.string().min(3).max(20).optional(),
   avatarUrl: z.string().url().optional().or(z.literal("")),

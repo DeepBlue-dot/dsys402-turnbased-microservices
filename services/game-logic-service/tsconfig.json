@@ -110,5 +110,5 @@
     "skipLibCheck": true,                                /* Skip type checking all .d.ts files. */
     "outDir": "dist"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../player-service/src/middleware/error.middleware.ts"],
 }

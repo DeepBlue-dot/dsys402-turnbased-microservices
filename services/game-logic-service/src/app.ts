@@ -10,6 +10,7 @@ const app = express();
 app.use(express.json());
 app.use("/", historyRoutes);
 
+
 const startApp = async () => {
   await initRabbit();
   await consumeEvents(config.gameLogicQueue, handleEvents);

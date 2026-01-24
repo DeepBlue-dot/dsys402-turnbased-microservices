@@ -5,12 +5,15 @@ import { initRabbit, consumeEvents } from "./services/rabbitmq.service.js";
 import { handleEvents } from "./consumers/Events.consumer.js";
 import { config } from "./config/env.js";
 import { startPresenceJanitor } from "./worker/janitor.worker.js";
+import {errorHandler} from "./middleware/error.middleware.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use("/", router);
+app.use(errorHandler);
+
 
 const startApp = async () => {
   await initRabbit();
