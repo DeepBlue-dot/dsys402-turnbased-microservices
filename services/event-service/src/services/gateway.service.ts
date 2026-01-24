@@ -14,6 +14,14 @@ export const gatewayService = {
       userId,
       instanceId: config.instanceId,
     });
+
+
+    const currentState = await gatewayService.handleSyncRequest(userId);
+
+    sendToUser(userId, ({
+          type: "CONNECT_SYNC",
+          data: currentState,
+        } ))
   },
 
   async handleHeartbeat(userId: string) {

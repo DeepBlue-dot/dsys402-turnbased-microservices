@@ -50,13 +50,7 @@ export const startWSServer = (server: http.Server) => {
 
       await gatewayService.handleConnect(userId, sessionId);
 
-      const currentState = await gatewayService.handleSyncRequest(userId);
-      socket.send(
-        JSON.stringify({
-          type: "CONNECT_SYNC",
-          data: currentState,
-        }),
-      );
+
 
       socket.on("message", async (data) => {
         try {
@@ -127,6 +121,7 @@ export const startWSServer = (server: http.Server) => {
           );
         }
       });
+      
 
       socket.on("close", async () => {
         if (socket.wasKicked) {

@@ -149,7 +149,7 @@ const handlePlayerKick = async (payload: {
 
     localSocket.send(
       JSON.stringify({
-        type: "ERROR",
+        type: "DISCONNECTED",
         message: "You have been logged in from another device.",
       }),
     );
