@@ -5,8 +5,6 @@ import { v4 as uuidv4 } from "uuid";
 const QUEUE_KEY = "match:queue:ranked";
 const JOIN_TIMES_KEY = "match:join_times";
 
-
-
 export const startMatchmakingWorker = () => {
   console.log("[Matchmaker] Worker started (Distributed Authority Mode)...");
 
@@ -20,7 +18,11 @@ export const startMatchmakingWorker = () => {
         const pARating = parseFloat(queuedPlayers[i + 1]);
 
         const pAData = await redis.hgetall(`presence:${pAId}`);
-        if (!pAData || Object.keys(pAData).length === 0 || pAData.status !== "QUEUED") {
+        if (
+          !pAData ||
+          Object.keys(pAData).length === 0 ||
+          pAData.status !== "QUEUED"
+        ) {
           await cleanupPlayer(pAId);
           continue;
         }
@@ -45,24 +47,30 @@ export const startMatchmakingWorker = () => {
 /**
  * Finds a partner and returns their ID and Rating
  */
-async function findPartner(id: string, rating: number, range: number): Promise<{id: string, rating: number} | null> {
+async function findPartner(
+  id: string,
+  rating: number,
+  range: number,
+): Promise<{ id: string; rating: number } | null> {
   // We fetch IDs and Scores (Ratings) from Redis
   const candidates = await redis.zrangebyscore(
-    QUEUE_KEY, 
-    rating - range, 
-    rating + range, 
+    QUEUE_KEY,
+    rating - range,
+    rating + range,
     "WITHSCORES", // Crucial: get the ratings too
-    "LIMIT", 0, 8
+    "LIMIT",
+    0,
+    8,
   );
-  
+
   for (let i = 0; i < candidates.length; i += 2) {
     const cId = candidates[i];
     const cRating = parseFloat(candidates[i + 1]);
 
     if (cId === id) continue;
-    
+
     const cData = await redis.hgetall(`presence:${cId}`);
-    
+
     if (cData && Object.keys(cData).length > 0 && cData.status === "QUEUED") {
       return { id: cId, rating: cRating };
     } else {
@@ -87,25 +95,14 @@ async function createMatch(p1: string, p2: string, r1: number, r2: number) {
     // 2. FETCH TARGET LOCATIONS (Now inside the presence hash)
     const [p1Data, p2Data] = await Promise.all([
       redis.hgetall(`presence:${p1}`),
-      redis.hgetall(`presence:${p2}`)
+      redis.hgetall(`presence:${p2}`),
     ]);
 
     const pipeline = redis.pipeline();
 
-    // 3. STATUS UPDATES
-    // We only update status if the presence hash still exists (Object.keys check)
-    const p1Exists = p1Data && Object.keys(p1Data).length > 0;
-    const p2Exists = p2Data && Object.keys(p2Data).length > 0;
-
-    if (p1Exists) pipeline.hset(`presence:${p1}`, "status", "IN_GAME");
-    if (p2Exists) pipeline.hset(`presence:${p2}`, "status", "IN_GAME");
-    
     pipeline.hdel(JOIN_TIMES_KEY, p1, p2);
     await pipeline.exec();
 
-    // 4. TARGETED PUBLISHING
-    // We send the 'match.created' event ONLY to the specific Gateway instances 
-    // where these players are physically connected.
     const instance1 = p1Data.instanceId;
     const instance2 = p2Data.instanceId;
 
@@ -113,7 +110,7 @@ async function createMatch(p1: string, p2: string, r1: number, r2: number) {
       await publishEvent(`match.created.${instance1}`, {
         matchId,
         players: [p1, p2],
-        mode: "ranked"
+        mode: "ranked",
       });
     }
 
@@ -122,25 +119,26 @@ async function createMatch(p1: string, p2: string, r1: number, r2: number) {
       await publishEvent(`match.created.${instance2}`, {
         matchId,
         players: [p1, p2],
-        mode: "ranked"
+        mode: "ranked",
       });
     }
 
     await publishEvent(`match.created`, {
-        matchId,
-        players: [p1, p2],
-        mode: "ranked"
-      });
+      matchId,
+      players: [p1, p2],
+      mode: "ranked",
+    });
 
-    console.log(`[Matchmaker] Success: ${matchId} | Instances: ${instance1}, ${instance2}`);
-
+    console.log(
+      `[Matchmaker] Success: ${matchId} | Instances: ${instance1}, ${instance2}`,
+    );
   } catch (err) {
-    console.error("[Matchmaker] CRITICAL: Match finalization failed. Rolling back players to queue...");
+    console.error(
+      "[Matchmaker] CRITICAL: Match finalization failed. Rolling back players to queue...",
+    );
 
-    // 5. THE ROLLBACK
-    // If RabbitMQ fails or Redis errors out, we must put them back in the queue
-    // using the original ratings (r1, r2) provided by the worker loop.
-    await redis.pipeline()
+    await redis
+      .pipeline()
       .hset(`presence:${p1}`, "status", "QUEUED")
       .hset(`presence:${p2}`, "status", "QUEUED")
       .zadd(QUEUE_KEY, r1, p1)
@@ -155,7 +153,8 @@ async function createMatch(p1: string, p2: string, r1: number, r2: number) {
  * Basic cleanup for matchmaking data structures
  */
 async function cleanupPlayer(userId: string) {
-  await redis.pipeline()
+  await redis
+    .pipeline()
     .zrem(QUEUE_KEY, userId)
     .hdel(JOIN_TIMES_KEY, userId)
     .exec();

@@ -51,8 +51,8 @@ export const config = {
   jwtSecret: required("JWT_SECRET"),
 
   // ⏳ Game Rules (Tunables)
-  turnTimeoutSec: Number(process.env.TURN_TIMEOUT_SEC) || 75,
+  turnTimeoutSec: Number(process.env.TURN_TIMEOUT_SEC) || 80,
   
   // 🧹 Janitor Tuning
-  watchdogIntervalMs: 15, // Check for timed-out matches every 2 seconds
+  watchdogIntervalMs: 4, // Check for timed-out matches every 2 seconds
 };
