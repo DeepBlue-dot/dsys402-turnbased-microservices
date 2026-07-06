@@ -1,9 +1,18 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { ReactNode } from "react";
 import { getWebSocketUrl } from "@/lib/api";
 import { getToken } from "@/lib/session";
+import { useAuth } from "@/hooks/useAuth";
 import type { GameSocketMessage, OutgoingSocketMessage } from "@/lib/types";
 
 type ConnectionState =
@@ -14,12 +23,28 @@ type ConnectionState =
   | "closed"
   | "error";
 
-export function useGameSocket(enabled = true) {
+type GameSocketContextValue = {
+  connect: () => void;
+  connectionState: ConnectionState;
+  disconnect: () => void;
+  error: string | null;
+  isConnected: boolean;
+  lastMessage: GameSocketMessage | null;
+  send: (message: OutgoingSocketMessage) => boolean;
+  sync: () => boolean;
+};
+
+const GameSocketContext = createContext<GameSocketContextValue | null>(null);
+
+export function GameSocketProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const socketRef = useRef<WebSocket | null>(null);
   const connectRef = useRef<() => void>(() => {});
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const shouldReconnectRef = useRef(enabled);
+  const shouldReconnectRef = useRef(false);
+  const socketGenerationRef = useRef(0);
+  const connectedUserIdRef = useRef<string | null>(null);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("idle");
   const [lastMessage, setLastMessage] = useState<GameSocketMessage | null>(null);
@@ -42,20 +67,23 @@ export function useGameSocket(enabled = true) {
   }, [send]);
 
   const disconnect = useCallback(() => {
+    socketGenerationRef.current += 1;
     shouldReconnectRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    connectedUserIdRef.current = null;
 
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
     }
 
-    socketRef.current?.close();
+    const socket = socketRef.current;
     socketRef.current = null;
+    socket?.close();
     setConnectionState("closed");
   }, []);
 
   const connect = useCallback(() => {
-    if (!enabled) return;
     if (socketRef.current?.readyState === WebSocket.OPEN) return;
     if (socketRef.current?.readyState === WebSocket.CONNECTING) return;
 
@@ -66,6 +94,8 @@ export function useGameSocket(enabled = true) {
     }
 
     shouldReconnectRef.current = true;
+    const socketGeneration = socketGenerationRef.current + 1;
+    socketGenerationRef.current = socketGeneration;
     setConnectionState(
       reconnectAttemptsRef.current > 0 ? "reconnecting" : "connecting",
     );
@@ -75,6 +105,7 @@ export function useGameSocket(enabled = true) {
     socketRef.current = socket;
 
     socket.onopen = () => {
+      if (socketGenerationRef.current !== socketGeneration) return;
       reconnectAttemptsRef.current = 0;
       setConnectionState("connected");
       setError(null);
@@ -82,6 +113,8 @@ export function useGameSocket(enabled = true) {
     };
 
     socket.onmessage = (event) => {
+      if (socketGenerationRef.current !== socketGeneration) return;
+
       try {
         setLastMessage(JSON.parse(event.data) as GameSocketMessage);
       } catch {
@@ -90,11 +123,13 @@ export function useGameSocket(enabled = true) {
     };
 
     socket.onerror = () => {
+      if (socketGenerationRef.current !== socketGeneration) return;
       setConnectionState("error");
       setError("Socket connection error.");
     };
 
     socket.onclose = () => {
+      if (socketGenerationRef.current !== socketGeneration) return;
       socketRef.current = null;
 
       if (!shouldReconnectRef.current) {
@@ -107,27 +142,39 @@ export function useGameSocket(enabled = true) {
       setConnectionState("reconnecting");
       reconnectTimerRef.current = setTimeout(() => connectRef.current(), delay);
     };
-  }, [enabled]);
+  }, []);
 
   useEffect(() => {
     connectRef.current = connect;
   }, [connect]);
 
   useEffect(() => {
-    shouldReconnectRef.current = enabled;
+    if (!user?.id) {
+      // Auth state is the external system this provider mirrors. Closing the
+      // socket here is intentional so logout cannot leave a reconnect alive.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      disconnect();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setConnectionState("idle");
+      return;
+    }
 
-    if (enabled) {
-      connect();
-    } else {
+    if (connectedUserIdRef.current && connectedUserIdRef.current !== user.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       disconnect();
     }
 
+    connectedUserIdRef.current = user.id;
+    connect();
+  }, [connect, disconnect, user?.id]);
+
+  useEffect(() => {
     return () => {
       disconnect();
     };
-  }, [connect, disconnect, enabled]);
+  }, [disconnect]);
 
-  return {
+  const value = useMemo<GameSocketContextValue>(() => ({
     connect,
     connectionState,
     disconnect,
@@ -136,5 +183,31 @@ export function useGameSocket(enabled = true) {
     lastMessage,
     send,
     sync,
-  };
+  }), [
+    connect,
+    connectionState,
+    disconnect,
+    error,
+    lastMessage,
+    send,
+    sync,
+  ]);
+
+  return (
+    <GameSocketContext.Provider value={value}>
+      {children}
+    </GameSocketContext.Provider>
+  );
+}
+
+export function useGameSocket(_enabled = true) {
+  void _enabled;
+
+  const context = useContext(GameSocketContext);
+
+  if (!context) {
+    throw new Error("useGameSocket must be used inside GameSocketProvider.");
+  }
+
+  return context;
 }

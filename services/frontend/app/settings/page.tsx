@@ -8,12 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { playerApi } from "@/lib/api";
-import { clearToken } from "@/lib/session";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { loading, player, refreshUser, user } = useAuth();
+  const { loading, logout, player, refreshUser, user } = useAuth();
   const [profile, setProfile] = useState({
     username: "",
     avatarUrl: "",
@@ -69,7 +68,7 @@ export default function SettingsPage() {
 
     void runSave(async () => {
       await playerApi.deleteMe();
-      clearToken();
+      await logout();
       router.push("/");
     }, "Account deleted.");
   }

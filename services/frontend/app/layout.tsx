@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
+import { Providers } from "@/app/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,10 +19,12 @@ export default function RootLayout({
         className="min-h-screen bg-background text-foreground antialiased"
         suppressHydrationWarning
       >
-        <Navbar />
-        <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-          {children}
-        </main>
+        <Providers>
+          <Navbar />
+          <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   );

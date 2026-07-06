@@ -1,11 +1,42 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import type { ReactNode } from "react";
 import { authApi, playerApi } from "@/lib/api";
 import { clearToken, getToken, setToken } from "@/lib/session";
 import type { CurrentPlayerState, LoginPayload, RegisterPayload } from "@/lib/types";
 
-export function useAuth() {
+type AuthUser = {
+  id: string;
+  email: string;
+  username: string;
+  rating: number;
+  status: CurrentPlayerState["status"];
+};
+
+type AuthContextValue = {
+  error: string | null;
+  hasToken: () => boolean;
+  isAuthenticated: boolean;
+  loading: boolean;
+  login: (payload: LoginPayload) => Promise<CurrentPlayerState | null>;
+  logout: () => Promise<void>;
+  player: CurrentPlayerState | null;
+  refreshUser: () => Promise<CurrentPlayerState | null>;
+  register: (payload: RegisterPayload) => Promise<CurrentPlayerState | null>;
+  user: AuthUser | null;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [player, setPlayer] = useState<CurrentPlayerState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,11 +111,11 @@ export function useAuth() {
     };
   }, [player]);
 
-  function hasToken() {
+  const hasToken = useCallback(() => {
     return !!getToken();
-  }
+  }, []);
 
-  return {
+  const value = useMemo<AuthContextValue>(() => ({
     error,
     hasToken,
     isAuthenticated: !!player,
@@ -95,5 +126,27 @@ export function useAuth() {
     refreshUser,
     register,
     user,
-  };
+  }), [
+    error,
+    loading,
+    login,
+    logout,
+    player,
+    refreshUser,
+    register,
+    user,
+    hasToken,
+  ]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used inside AuthProvider.");
+  }
+
+  return context;
 }
