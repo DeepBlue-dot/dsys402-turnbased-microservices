@@ -154,13 +154,11 @@ export function GameSocketProvider({ children }: { children: ReactNode }) {
       // socket here is intentional so logout cannot leave a reconnect alive.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       disconnect();
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConnectionState("idle");
       return;
     }
 
     if (connectedUserIdRef.current && connectedUserIdRef.current !== user.id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       disconnect();
     }
 

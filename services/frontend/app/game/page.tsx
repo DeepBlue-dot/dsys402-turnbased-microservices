@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -9,15 +10,20 @@ import {
   Flag,
   History,
   Loader2,
+  MessageSquare,
   Play,
   Radio,
   RefreshCcw,
+  Send,
   ShieldAlert,
   Swords,
+  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { playerApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameSocket } from "@/hooks/useGameSocket";
 import type {
@@ -26,6 +32,8 @@ import type {
   GameOverMessage,
   GameSocketMessage,
   GameSymbol,
+  PlayerStats,
+  PublicPlayerInfo,
 } from "@/lib/types";
 
 const emptyBoard: BoardCell[] = Array(9).fill("") as BoardCell[];
@@ -36,6 +44,14 @@ type FeedItem = {
   title: string;
   detail: string;
   symbol?: GameSymbol;
+};
+
+type ChatItem = {
+  id: string;
+  at: string;
+  from: "me" | "opponent" | "system";
+  text: string;
+  status?: "sent" | "failed" | "pending";
 };
 
 function normalizeBoard(board?: BoardCell[]) {
@@ -63,6 +79,44 @@ function shortId(id?: string) {
   return id ? id.slice(0, 8) : "unknown";
 }
 
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "?";
+}
+
+function formatStatus(status?: string) {
+  if (!status) return "Offline";
+  return status.replaceAll("_", " ").toLowerCase();
+}
+
+function statusClasses(status?: string) {
+  if (status === "IN_GAME") return "border-primary/30 bg-primary/10 text-primary";
+  if (status === "IDLE") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
+  if (status === "QUEUED") return "border-amber-300/30 bg-amber-300/10 text-amber-200";
+  return "border-muted bg-muted/40 text-muted-foreground";
+}
+
+function formatRecord(stats?: PlayerStats | null) {
+  if (!stats) return "0W 0L 0D";
+  return `${stats.wins}W ${stats.losses}L ${stats.draws}D`;
+}
+
+function formatLastOnline(value?: string | null) {
+  if (!value) return "No recent activity";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "No recent activity";
+
+  return `Last seen ${date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  })}`;
+}
+
 function cellName(position: number) {
   const row = Math.floor(position / 3) + 1;
   const column = (position % 3) + 1;
@@ -82,6 +136,78 @@ function findNewMove(previous: BoardCell[], next: BoardCell[]) {
   return null;
 }
 
+function PlayerPanel({
+  align = "left",
+  label,
+  name,
+  rating,
+  record,
+  status,
+  symbol,
+  supporting,
+}: {
+  align?: "left" | "right";
+  label: string;
+  name: string;
+  rating: number;
+  record: string;
+  status: string;
+  symbol: GameSymbol;
+  supporting: string;
+}) {
+  return (
+    <div className={cn(
+      "rounded-md border border-border bg-card p-3",
+      align === "right" && "text-right",
+    )}>
+      <div className={cn(
+        "flex items-start gap-3",
+        align === "right" && "flex-row-reverse",
+      )}>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted/30 font-bold">
+          {name === "Waiting for opponent" ? (
+            <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+          ) : (
+            initials(name)
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs uppercase text-muted-foreground">{label}</p>
+          <p className="mt-1 truncate text-lg font-semibold">{name}</p>
+          <div className={cn(
+            "mt-2 flex flex-wrap gap-2",
+            align === "right" && "justify-end",
+          )}>
+            <span className={cn(
+              "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs capitalize",
+              statusClasses(status),
+            )}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+              {formatStatus(status)}
+            </span>
+            <span className="rounded-md border border-border bg-muted/30 px-2 py-1 font-mono text-xs text-muted-foreground">
+              {rating} Elo
+            </span>
+          </div>
+        </div>
+        <span className={cn(
+          "text-3xl font-black",
+          symbol === "X" ? "text-primary" : "text-accent",
+        )}>
+          {symbol}
+        </span>
+      </div>
+      <div className={cn(
+        "mt-3 grid gap-1 text-xs text-muted-foreground",
+        align === "right" && "justify-items-end",
+      )}>
+        <span>{record}</span>
+        <span>{supporting}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function GamePage() {
   const router = useRouter();
   const { loading, player, refreshUser, user } = useAuth();
@@ -98,6 +224,9 @@ export default function GamePage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [chat, setChat] = useState<ChatItem[]>([]);
+  const [chatText, setChatText] = useState("");
+  const [opponentInfo, setOpponentInfo] = useState<PublicPlayerInfo | null>(null);
   const boardRef = useRef<{ matchId: string | null; board: BoardCell[] }>({
     matchId: null,
     board: [...emptyBoard],
@@ -105,6 +234,8 @@ export default function GamePage() {
   const gameRef = useRef<ActiveGameState | null>(null);
   const gameOverRef = useRef<GameOverMessage["data"] | null>(null);
   const lastProcessedMessageRef = useRef<string | null>(null);
+  const opponentId = game?.opponentId ||
+    game?.players.find((playerId) => playerId !== user?.id);
 
   const recordEvent = useCallback((item: Omit<FeedItem, "id" | "at">) => {
     setFeed((current) => [
@@ -119,6 +250,20 @@ export default function GamePage() {
       },
       ...current,
     ].slice(0, 8));
+  }, []);
+
+  const recordChat = useCallback((item: Omit<ChatItem, "id" | "at">) => {
+    setChat((current) => [
+      ...current,
+      {
+        ...item,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        at: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      },
+    ].slice(-30));
   }, []);
 
   const commitGame = useCallback((
@@ -139,6 +284,7 @@ export default function GamePage() {
 
     if (!isSameMatch) {
       setFeed([]);
+      setChat([]);
     }
 
     if (options.recordMove && isSameMatch) {
@@ -190,7 +336,7 @@ export default function GamePage() {
   useEffect(() => {
     if (!lastMessage) return;
 
-    const signature = `${lastMessage.type}:${JSON.stringify(lastMessage.data ?? null)}`;
+    const signature = JSON.stringify(lastMessage);
     if (lastProcessedMessageRef.current === signature) {
       return;
     }
@@ -223,9 +369,7 @@ export default function GamePage() {
       commitGame(matchGame, {
         source: "match",
         eventTitle: "Match allocated",
-        eventDetail: lastMessage.data.opponentId
-          ? `Opponent ${shortId(lastMessage.data.opponentId)} found`
-          : "Opponent found",
+        eventDetail: "Opponent found",
       });
       return;
     }
@@ -277,6 +421,36 @@ export default function GamePage() {
       return;
     }
 
+    if (lastMessage.type === "CHAT_MESSAGE") {
+      if (lastMessage.data.matchId !== currentGame?.matchId) return;
+
+      recordChat({
+        from: lastMessage.data.from === user?.id ? "me" : "opponent",
+        text: lastMessage.data.text,
+        status: "sent",
+      });
+      return;
+    }
+
+    if (lastMessage.type === "chat.status") {
+      if (lastMessage.matchId !== currentGame?.matchId) return;
+
+      const failed = lastMessage.status === "FAILED";
+      const reason = formatReason(lastMessage.reason);
+      recordChat({
+        from: "system",
+        text: failed
+          ? `Message failed${reason ? `: ${reason}` : "."}`
+          : "Message delivered.",
+        status: failed ? "failed" : "sent",
+      });
+
+      if (failed) {
+        setNotice(reason ? `Chat failed: ${reason}.` : "Chat message failed.");
+      }
+      return;
+    }
+
     if (lastMessage.type === "GAME_OVER") {
       setGameOver(lastMessage.data);
       if (currentGame) {
@@ -307,7 +481,7 @@ export default function GamePage() {
           : data?.reason || lastMessage.message || "Gateway error.",
       );
     }
-  }, [commitGame, lastMessage, recordEvent, refreshUser]);
+  }, [commitGame, lastMessage, recordChat, recordEvent, refreshUser, user?.id]);
 
   useEffect(() => {
     if (!game?.expiresAt || gameOver) {
@@ -324,18 +498,50 @@ export default function GamePage() {
     return () => clearInterval(timer);
   }, [game?.expiresAt, gameOver]);
 
+  useEffect(() => {
+    if (!opponentId) {
+      setOpponentInfo(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    playerApi.publicProfile(opponentId)
+      .then((profile) => {
+        if (!cancelled) {
+          setOpponentInfo(profile);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOpponentInfo(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [opponentId]);
+
   const board = normalizeBoard(game?.board);
   const opponentSymbol = useMemo<GameSymbol>(() => {
     return game?.mySymbol === "X" ? "O" : "X";
   }, [game?.mySymbol]);
   const isMyTurn = !!game && !!user && game.turn === user.id && !gameOver;
-  const opponentLabel = game?.opponentId
-    ? `Player ${shortId(game.opponentId)}`
-    : "Opponent";
+  const currentPlayerName = user?.username || player?.profile?.username || "You";
+  const currentPlayerStats = player?.stats || null;
+  const currentPlayerRating = currentPlayerStats?.rating || player?.rating || user?.rating || 1000;
+  const opponentLabel = opponentInfo?.username || (opponentId ? "Opponent" : "Waiting for opponent");
+  const opponentStatus = opponentInfo?.status || (game ? "IN_GAME" : "OFFLINE");
+  const opponentRating = opponentInfo?.rating || opponentInfo?.stats?.rating || 1000;
+  const chatRecipientId = opponentId;
+  const canChat = !!game && !!chatRecipientId && isConnected && !gameOver;
   const turnLabel = game?.turn === user?.id
     ? "You"
-    : game?.turn
-      ? `Player ${shortId(game.turn)}`
+    : game?.turn === opponentId
+      ? opponentLabel
+      : game?.turn
+        ? "Opponent"
       : "Waiting";
   const statusText = gameOver
     ? `Game over: ${gameOver.result.toLowerCase()}`
@@ -381,6 +587,37 @@ export default function GamePage() {
     if (!sent) {
       setNotice("Forfeit was not sent because the socket is disconnected.");
     }
+  }
+
+  function sendChat(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const text = chatText.trim();
+    if (!game || !text) return;
+
+    if (!chatRecipientId) {
+      setNotice("Chat is unavailable until an opponent is identified.");
+      return;
+    }
+
+    const sent = send({
+      type: "CHAT",
+      to: chatRecipientId,
+      matchId: game.matchId,
+      text,
+    });
+
+    if (!sent) {
+      setNotice("Chat was not sent because the socket is disconnected.");
+      return;
+    }
+
+    recordChat({
+      from: "me",
+      text,
+      status: "pending",
+    });
+    setChatText("");
   }
 
   if (loading || !user) {
@@ -466,11 +703,15 @@ export default function GamePage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border border-border bg-card p-3">
-            <p className="text-xs uppercase text-muted-foreground">You</p>
-            <p className="mt-1 text-lg font-semibold">{user.username}</p>
-            <p className="text-3xl font-black text-primary">{game.mySymbol}</p>
-          </div>
+          <PlayerPanel
+            label="You"
+            name={currentPlayerName}
+            rating={currentPlayerRating}
+            record={formatRecord(currentPlayerStats)}
+            status={player?.status || user.status}
+            symbol={game.mySymbol}
+            supporting={player?.profile?.bio || "Ready in this match"}
+          />
           <div className="rounded-md border border-border bg-card p-3 text-center">
             <p className="text-xs uppercase text-muted-foreground">Turn timer</p>
             <p className="mt-1 flex items-center justify-center gap-2 font-mono text-3xl font-bold">
@@ -479,11 +720,16 @@ export default function GamePage() {
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Turn: {turnLabel}</p>
           </div>
-          <div className="rounded-md border border-border bg-card p-3 text-right">
-            <p className="text-xs uppercase text-muted-foreground">Opponent</p>
-            <p className="mt-1 text-lg font-semibold">{opponentLabel}</p>
-            <p className="text-3xl font-black text-accent">{opponentSymbol}</p>
-          </div>
+          <PlayerPanel
+            align="right"
+            label="Opponent"
+            name={opponentLabel}
+            rating={opponentRating}
+            record={formatRecord(opponentInfo?.stats)}
+            status={opponentStatus}
+            symbol={opponentSymbol}
+            supporting={opponentInfo?.bio || formatLastOnline(opponentInfo?.lastOnline)}
+          />
         </div>
 
         {(notice || socketError) && (
@@ -519,6 +765,62 @@ export default function GamePage() {
       </section>
 
       <aside className="flex min-w-0 flex-col gap-4 lg:justify-center">
+        <div className="rounded-md border border-border bg-card p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Match Chat</h2>
+              <p className="text-sm text-muted-foreground">
+                {chatRecipientId
+                  ? `To ${opponentLabel} (${formatStatus(opponentStatus)})`
+                  : "Waiting for opponent"}
+              </p>
+            </div>
+            <MessageSquare className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+          </div>
+
+          <div className="mb-3 flex max-h-52 min-h-28 flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/20 p-3">
+            {chat.length === 0 ? (
+              <p className="m-auto text-center text-sm text-muted-foreground">
+                No messages yet.
+              </p>
+            ) : (
+              chat.map((item) => (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "max-w-[85%] rounded-md border px-3 py-2 text-sm",
+                    item.from === "me" && "ml-auto border-primary/30 bg-primary/10",
+                    item.from === "opponent" && "mr-auto border-border bg-card",
+                    item.from === "system" && "mx-auto border-muted bg-muted/40 text-muted-foreground",
+                  )}
+                >
+                  <p>{item.text}</p>
+                  <p className="mt-1 font-mono text-[10px] uppercase text-muted-foreground">
+                    {item.from === "me" ? "You" : item.from === "opponent" ? opponentLabel : "System"} · {item.at}
+                    {item.status === "pending" ? " · sending" : ""}
+                    {item.status === "failed" ? " · failed" : ""}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+
+          <form className="flex gap-2" onSubmit={sendChat}>
+            <Input
+              aria-label="Match chat message"
+              value={chatText}
+              onChange={(event) => setChatText(event.target.value)}
+              placeholder={canChat ? "Message opponent..." : "Chat unavailable"}
+              maxLength={240}
+              disabled={!canChat}
+            />
+            <Button type="submit" size="sm" disabled={!canChat || !chatText.trim()}>
+              <Send className="h-4 w-4" aria-hidden="true" />
+              <span className="sr-only">Send</span>
+            </Button>
+          </form>
+        </div>
+
         <div className="rounded-md border border-border bg-card p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>

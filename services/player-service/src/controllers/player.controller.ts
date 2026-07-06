@@ -200,13 +200,34 @@ export const deleteMyAccount = catchAsync(
 // GET /:id/profile
 export const getPublicProfile = catchAsync(
   async (req: AuthRequest, res: Response) => {
-    const profile = await prisma.playerProfile.findUnique({
-      where: { playerId: req.params.id },
-      select: { username: true, avatarUrl: true, bio: true }, // Don't even fetch playerId/id
+    const player = await prisma.player.findUnique({
+      where: { id: req.params.id },
+      include: { profile: true, stats: true },
     });
 
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
-    res.json(profile);
+    if (!player || !player.profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const presence = await redis.hgetall(`presence:${player.id}`);
+
+    res.json({
+      id: player.id,
+      username: player.profile.username,
+      avatarUrl: player.profile.avatarUrl,
+      bio: player.profile.bio,
+      status: presence?.status ?? "OFFLINE",
+      rating: player.stats?.rating ?? 1000,
+      stats: player.stats
+        ? {
+            rating: player.stats.rating,
+            wins: player.stats.wins,
+            losses: player.stats.losses,
+            draws: player.stats.draws,
+          }
+        : null,
+      lastOnline: player.lastOnline,
+    });
   },
 );
 

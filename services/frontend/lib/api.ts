@@ -6,6 +6,7 @@ import type {
   LoginPayload,
   MatchHistoryResponse,
   MatchDetail,
+  PublicPlayerInfo,
   RegisterPayload,
 } from "@/lib/types";
 
@@ -82,6 +83,11 @@ export const authApi = {
 export const playerApi = {
   async me() {
     const res = await api.get<CurrentPlayerState>("/player/me");
+    return res.data;
+  },
+
+  async publicProfile(playerId: string) {
+    const res = await api.get<PublicPlayerInfo>(`/player/${playerId}/profile`);
     return res.data;
   },
 

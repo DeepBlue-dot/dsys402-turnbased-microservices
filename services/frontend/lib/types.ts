@@ -60,6 +60,17 @@ export type CurrentPlayerState = {
   game?: ActiveGameState;
 };
 
+export type PublicPlayerInfo = {
+  id: string;
+  username: string;
+  avatarUrl?: string | null;
+  bio?: string | null;
+  status: PlayerStatus | string;
+  rating: number;
+  stats?: PlayerStats | null;
+  lastOnline?: string | null;
+};
+
 export type MatchHistoryItem = {
   matchId: string;
   opponentId: string | null;
@@ -193,6 +204,27 @@ export type GameOverMessage = {
   timestamp?: string;
 };
 
+export type ChatMessage = {
+  type: "CHAT_MESSAGE";
+  data: {
+    from: string;
+    to: string;
+    matchId: string;
+    text: string;
+    sentAt: string;
+  };
+  timestamp?: string;
+};
+
+export type ChatStatusMessage = {
+  type: "chat.status";
+  status: "SENT" | "FAILED";
+  reason?: "NOT_IN_SAME_MATCH" | "RECIPIENT_OFFLINE" | string;
+  matchId: string;
+  to: string;
+  timestamp?: string;
+};
+
 export type AckMessage = {
   type: "ACK";
   data: {
@@ -218,6 +250,8 @@ export type GameSocketMessage =
   | GameTurnMessage
   | InvalidMoveMessage
   | GameOverMessage
+  | ChatMessage
+  | ChatStatusMessage
   | AckMessage
   | ErrorMessage;
 
@@ -240,4 +274,10 @@ export type OutgoingSocketMessage =
       payload: {
         matchId: string;
       };
+    }
+  | {
+      type: "CHAT";
+      to: string;
+      matchId: string;
+      text: string;
     };
