@@ -18,6 +18,8 @@ services:
     depends_on:
       - event-service
       - player-service
+      - matchmaking-service
+      - game-logic-service
     ulimits:
       nofile:
         soft: 20000

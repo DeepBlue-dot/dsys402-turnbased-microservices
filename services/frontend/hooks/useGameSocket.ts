@@ -1,52 +1,140 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getWebSocketUrl } from "@/lib/api";
+import { getToken } from "@/lib/session";
+import type { GameSocketMessage, OutgoingSocketMessage } from "@/lib/types";
 
-const GAME_SOCKET_URL = "ws://localhost:4000";
+type ConnectionState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "closed"
+  | "error";
 
-export function useGameSocket(playerId: string | undefined) {
-    const [socket, setSocket] = useState<WebSocket | null>(null);
-    const [isConnected, setIsConnected] = useState(false);
-    const [lastMessage, setLastMessage] = useState<any>(null);
+export function useGameSocket(enabled = true) {
+  const socketRef = useRef<WebSocket | null>(null);
+  const connectRef = useRef<() => void>(() => {});
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const shouldReconnectRef = useRef(enabled);
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("idle");
+  const [lastMessage, setLastMessage] = useState<GameSocketMessage | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-    // Keep reference to prevent multiple connections
-    const wsRef = useRef<WebSocket | null>(null);
+  const send = useCallback((message: OutgoingSocketMessage) => {
+    const socket = socketRef.current;
 
-    useEffect(() => {
-        if (!playerId) return;
-        if (wsRef.current) return; // Already connected
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      setError("Socket is not connected.");
+      return false;
+    }
 
-        console.log("Connecting to Game Socket...");
-        const ws = new WebSocket(`${GAME_SOCKET_URL}?playerId=${playerId}`);
+    socket.send(JSON.stringify(message));
+    return true;
+  }, []);
 
-        ws.onopen = () => {
-            console.log("Game Socket Connected");
-            setIsConnected(true);
-        };
+  const sync = useCallback(() => {
+    return send({ type: "SYNC_REQUEST" });
+  }, [send]);
 
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                console.log("Socket Message:", data);
-                setLastMessage(data);
-            } catch (e) {
-                console.error("Failed to parse socket message", event.data);
-            }
-        };
+  const disconnect = useCallback(() => {
+    shouldReconnectRef.current = false;
 
-        ws.onclose = () => {
-            console.log("Game Socket Disconnected");
-            setIsConnected(false);
-            wsRef.current = null;
-        };
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
 
-        wsRef.current = ws;
-        setSocket(ws);
+    socketRef.current?.close();
+    socketRef.current = null;
+    setConnectionState("closed");
+  }, []);
 
-        return () => {
-            // Optional cleaning
-        };
-    }, [playerId]);
+  const connect = useCallback(() => {
+    if (!enabled) return;
+    if (socketRef.current?.readyState === WebSocket.OPEN) return;
+    if (socketRef.current?.readyState === WebSocket.CONNECTING) return;
 
-    return { socket, isConnected, lastMessage };
+    const token = getToken();
+    if (!token) {
+      setConnectionState("idle");
+      return;
+    }
+
+    shouldReconnectRef.current = true;
+    setConnectionState(
+      reconnectAttemptsRef.current > 0 ? "reconnecting" : "connecting",
+    );
+    setError(null);
+
+    const socket = new WebSocket(getWebSocketUrl(token));
+    socketRef.current = socket;
+
+    socket.onopen = () => {
+      reconnectAttemptsRef.current = 0;
+      setConnectionState("connected");
+      setError(null);
+      socket.send(JSON.stringify({ type: "SYNC_REQUEST" }));
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        setLastMessage(JSON.parse(event.data) as GameSocketMessage);
+      } catch {
+        setError("Received an unreadable socket message.");
+      }
+    };
+
+    socket.onerror = () => {
+      setConnectionState("error");
+      setError("Socket connection error.");
+    };
+
+    socket.onclose = () => {
+      socketRef.current = null;
+
+      if (!shouldReconnectRef.current) {
+        setConnectionState("closed");
+        return;
+      }
+
+      reconnectAttemptsRef.current += 1;
+      const delay = Math.min(1000 * 2 ** reconnectAttemptsRef.current, 8000);
+      setConnectionState("reconnecting");
+      reconnectTimerRef.current = setTimeout(() => connectRef.current(), delay);
+    };
+  }, [enabled]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
+
+  useEffect(() => {
+    shouldReconnectRef.current = enabled;
+
+    if (enabled) {
+      connect();
+    } else {
+      disconnect();
+    }
+
+    return () => {
+      disconnect();
+    };
+  }, [connect, disconnect, enabled]);
+
+  return {
+    connect,
+    connectionState,
+    disconnect,
+    error,
+    isConnected: connectionState === "connected",
+    lastMessage,
+    send,
+    sync,
+  };
 }

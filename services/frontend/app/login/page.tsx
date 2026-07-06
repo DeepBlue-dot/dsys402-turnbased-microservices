@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/services/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,22 +23,17 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await api.auth.login({ email, password });
-      localStorage.setItem("token", res.data.token);
-      // Determine what data the API returns for user
-      localStorage.setItem("user", JSON.stringify(res.data.user || { email }));
-
-      // Force a hard navigation to refresh usage of useAuth
-      window.location.href = "/dashboard";
-    } catch (err: any) {
-      setError(err.message || "An unknown error occurred.");
+      await login({ email, password });
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
+    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">
@@ -76,6 +73,7 @@ export default function LoginPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
+              <LogIn className="h-4 w-4" aria-hidden="true" />
               {loading ? "Logging in..." : "Login"}
             </Button>
           </form>

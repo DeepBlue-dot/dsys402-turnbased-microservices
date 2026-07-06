@@ -1,6 +1,5 @@
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient, Prisma } from "@prisma/client";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -9,27 +8,24 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not defined");
 }
 
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL,
-});
-
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 /**
  * Configurable defaults
  */
 const DEFAULT_RATING = 1200;
-const SALT_ROUNDS = 12;
+const SALT_ROUNDS = Number(process.env.SALT_ROUNDS) || 12;
 
 /**
  * Seed data
+ * Note: `role` is not stored on the current Prisma `Player` model.
+ * Role-related fields are therefore ignored by the schema-aware seeder.
  */
 const players = [
   {
     username: "admin",
     email: "admin@example.com",
     password: "admin123",
-    role: "ADMIN",
     rating: 1500,
     wins: 10,
     losses: 2,
@@ -38,59 +34,104 @@ const players = [
     username: "player1",
     email: "player1@example.com",
     password: "password123",
-    role: "PLAYER",
     rating: DEFAULT_RATING,
     wins: 3,
     losses: 5,
   },
 ];
 
-async function seedPlayers() {
-  console.log("👤 Seeding players...");
+/**
+ * Upsert a single player and related profile/stats in a transaction.
+ * Returns the Player id.
+ */
+async function upsertPlayer(tx: Prisma.TransactionClient, p: typeof players[number]) {
+  // Hash the password before creating/updating
+  const passwordHash = await bcrypt.hash(p.password, SALT_ROUNDS);
 
-  for (const player of players) {
-    const passwordHash = await bcrypt.hash(
-      player.password,
-      SALT_ROUNDS
-    );
+  // Find existing player by email
+  const existing = await tx.player.findUnique({ where: { email: p.email } });
 
-    await prisma.player.upsert({
-      where: { email: player.email },
-      update: {
-        username: player.username,
-        role: player.role,
-      },
-      create: {
-        username: player.username,
-        email: player.email,
-        password: passwordHash,
-        role: player.role,
-        rating: player.rating ?? DEFAULT_RATING,
-        wins: player.wins ?? 0,
-        losses: player.losses ?? 0,
-        status: "ONLINE",
-      },
+  let playerId: string;
+
+  if (existing) {
+    // Update stored password hash if necessary
+    await tx.player.update({
+      where: { email: p.email },
+      data: { password: passwordHash },
     });
-
-    console.log(`✅ Seeded player: ${player.email}`);
+    playerId = existing.id;
+  } else {
+    const created = await tx.player.create({
+      data: { email: p.email, password: passwordHash },
+    });
+    playerId = created.id;
   }
+
+  // Upsert PlayerProfile (stores username)
+  await tx.playerProfile.upsert({
+    where: { playerId },
+    update: { username: p.username },
+    create: { playerId, username: p.username },
+  });
+
+  // Upsert PlayerStats
+  await tx.playerStats.upsert({
+    where: { playerId },
+    update: {
+      wins: p.wins ?? 0,
+      losses: p.losses ?? 0,
+      rating: p.rating ?? DEFAULT_RATING,
+    },
+    create: {
+      playerId,
+      wins: p.wins ?? 0,
+      losses: p.losses ?? 0,
+      draws: 0,
+      rating: p.rating ?? DEFAULT_RATING,
+    },
+  });
+
+  return playerId;
 }
 
-async function main() {
-  console.log("🌱 Starting database seed...");
+async function seedAll(reset = false) {
+  console.log("👤 Seeding players...");
 
-  await prisma.$transaction(async () => {
-    await seedPlayers();
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    for (const p of players) {
+      if (reset) {
+        // Remove existing player and related records by email
+        const existing = await tx.player.findUnique({ where: { email: p.email } });
+        if (existing) {
+          await tx.playerStats.deleteMany({ where: { playerId: existing.id } });
+          await tx.playerProfile.deleteMany({ where: { playerId: existing.id } });
+          await tx.player.delete({ where: { id: existing.id } });
+          console.log(`🗑️  Removed existing player: ${p.email}`);
+        }
+      }
+
+      const id = await upsertPlayer(tx, p);
+      console.log(`✅ Ensured player: ${p.email} (id=${id})`);
+    }
   });
 
   console.log("🌱 Database seed completed successfully.");
 }
 
-main()
-  .catch((error) => {
-    console.error("❌ Seeding failed:", error);
+async function main() {
+  try {
+    const args = process.argv.slice(2);
+    const reset = args.includes("--reset") || args.includes("-r");
+
+    if (reset) console.log("⚠️  Running in reset mode: existing users will be removed first.");
+
+    await seedAll(reset);
+  } catch (err) {
+    console.error("❌ Seeding failed:", err);
     process.exit(1);
-  })
-  .finally(async () => {
+  } finally {
     await prisma.$disconnect();
-  });
+  }
+}
+
+main();

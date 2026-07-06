@@ -1,114 +1,220 @@
-"use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { ArrowLeft, Loader2, Radio, RefreshCcw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { api } from "@/services/api";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { matchmakingApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameSocket } from "@/hooks/useGameSocket";
+import type { CurrentPlayerState, GameSocketMessage, PlayerStatus } from "@/lib/types";
+
+function getSyncState(message: GameSocketMessage | null) {
+  if (
+    message?.type === "CONNECT_SYNC" ||
+    message?.type === "SYNC_RESPONSE"
+  ) {
+    return message.data;
+  }
+
+  return null;
+}
 
 export default function MatchmakingPage() {
-    const router = useRouter();
-    const { user } = useAuth();
-    const [status, setStatus] = useState<"searching" | "found">("searching");
-    const [opponent, setOpponent] = useState<any>(null);
-    const [matchId, setMatchId] = useState<string | null>(null);
+  const router = useRouter();
+  const { loading, player, refreshUser, user } = useAuth();
+  const { connectionState, isConnected, lastMessage, sync } = useGameSocket(
+    !!user,
+  );
+  const requestedJoinRef = useRef(false);
+  const [joining, setJoining] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [queueStartedAt, setQueueStartedAt] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const syncState = getSyncState(lastMessage);
 
-    // Connect to socket to receive match updates
-    const { isConnected, lastMessage } = useGameSocket(user?.id);
+  const livePlayer = useMemo<Partial<CurrentPlayerState> | null>(() => {
+    if (!player) return null;
 
-    useEffect(() => {
-        if (!user?.id) return;
-
-        // Start matchmaking when user ID is available
-        const searchMatch = async () => {
-            try {
-                await api.matchmaking.join(user.id);
-            } catch (err) {
-                console.error("Failed to join matchmaking", err);
-            }
-        };
-
-        // Only join if we are not already found
-        if (status === "searching" && isConnected) {
-            searchMatch();
-        }
-
-    }, [user?.id, isConnected, status]);
-
-    useEffect(() => {
-        if (lastMessage && lastMessage.event === "match_found") {
-            setOpponent({
-                username: "Opponent", // The backend event might need to send this, currently assuming structure
-                rank: "Unknown",
-                winRate: "Unknown"
-            });
-            setMatchId(lastMessage.matchId);
-            setStatus("found");
-
-            // Store match info for the game page to use
-            localStorage.setItem("currentMatch", JSON.stringify(lastMessage));
-        }
-    }, [lastMessage]);
-
-    const handleStartGame = () => {
-        // Navigate to the game board
-        router.push("/game");
+    return {
+      ...player,
+      ...syncState,
+      game: syncState?.game || player.game,
+      queue: syncState?.queue || player.queue,
+      status: (syncState?.status as PlayerStatus | undefined) || player.status,
     };
+  }, [player, syncState]);
 
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [loading, router, user]);
+
+  useEffect(() => {
+    if (!queueStartedAt) return;
+
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - queueStartedAt) / 1000));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [queueStartedAt]);
+
+  useEffect(() => {
+    if (!isConnected || !user || requestedJoinRef.current) return;
+
+    if (livePlayer?.status === "IN_GAME" || livePlayer?.game) {
+      router.push("/game");
+      return;
+    }
+
+    requestedJoinRef.current = true;
+    setJoining(true);
+    setError(null);
+
+    matchmakingApi
+      .join()
+      .then(() => {
+        setQueueStartedAt(Date.now());
+        return refreshUser();
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "Failed to join queue.";
+        if (message.includes("already searching")) {
+          setQueueStartedAt(Date.now());
+          return;
+        }
+        setError(message);
+      })
+      .finally(() => setJoining(false));
+  }, [isConnected, livePlayer?.game, livePlayer?.status, refreshUser, router, user]);
+
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    if (
+      lastMessage.type === "MATCH_CREATED" ||
+      lastMessage.type === "GAME_STARTED" ||
+      (getSyncState(lastMessage)?.status === "IN_GAME")
+    ) {
+      router.push("/game");
+    }
+
+    if (lastMessage.type === "QUEUE_JOINED") {
+      setQueueStartedAt(Date.now());
+      setError(null);
+    }
+
+    if (lastMessage.type === "QUEUE_LEFT") {
+      router.push("/dashboard");
+    }
+
+    if (lastMessage.type === "MATCH_ERROR" || lastMessage.type === "ERROR") {
+      const data = lastMessage.data;
+      setError(
+        typeof data === "string"
+          ? data
+          : data?.reason || lastMessage.message || "Matchmaking error.",
+      );
+    }
+  }, [lastMessage, router]);
+
+  async function leaveQueue() {
+    setError(null);
+    try {
+      await matchmakingApi.leave();
+      await refreshUser();
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to leave queue.");
+    }
+  }
+
+  if (loading || !user) {
     return (
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-10rem)] space-y-8 p-4">
-
-            {status === "searching" && (
-                <Card className="w-full max-w-md border-none bg-transparent shadow-none text-center">
-                    <div className="flex justify-center mb-6">
-                        <div className="relative">
-                            <div className="w-24 h-24 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-2xl">🔍</span>
-                            </div>
-                        </div>
-                    </div>
-                    <CardTitle className="text-3xl font-bold animate-pulse">Scanning Network...</CardTitle>
-                    <CardDescription className="text-lg mt-2">
-                        Searching for an opponent with similar capacity...
-                    </CardDescription>
-                </Card>
-            )}
-
-            {status === "found" && opponent && (
-                <Card className="w-full max-w-md animate-in fade-in zoom-in duration-500 border-primary">
-                    <CardHeader className="text-center bg-primary/10 rounded-t-xl">
-                        <CardTitle className="text-green-500 uppercase tracking-widest text-xl">Match Found!</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6 text-center space-y-4">
-                        <div className="avatar w-20 h-20 rounded-full bg-secondary mx-auto flex items-center justify-center text-3xl font-bold text-secondary-foreground">
-                            {opponent.username.charAt(0)}
-                        </div>
-                        <div>
-                            <h2 className="text-3xl font-bold">{opponent.username}</h2>
-                            <p className="text-muted-foreground">{opponent.rank}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 bg-muted/50 p-4 rounded-lg">
-                            <div>
-                                <p className="text-xs text-muted-foreground uppercase">Win Rate</p>
-                                <p className="font-bold">{opponent.winRate}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground uppercase">Status</p>
-                                <p className="font-bold text-green-600">Online</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                    <CardFooter>
-                        <Button size="lg" className="w-full font-bold text-lg h-12" onClick={handleStartGame}>
-                            PLAY MATCH
-                        </Button>
-                    </CardFooter>
-                </Card>
-            )}
-        </div>
+      <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
+        <p className="animate-pulse text-muted-foreground">Preparing queue...</p>
+      </div>
     );
+  }
+
+  const waitTime = livePlayer?.queue?.waitTimeSeconds ?? elapsed;
+  const position = livePlayer?.queue?.position;
+
+  return (
+    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center p-2">
+      <Card className="w-full max-w-lg overflow-hidden">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-md border border-primary/30 bg-primary/10">
+            {isConnected ? (
+              <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden="true" />
+            ) : (
+              <Radio className="h-10 w-10 text-muted-foreground" aria-hidden="true" />
+            )}
+          </div>
+          <CardTitle className="text-3xl">Scanning Network</CardTitle>
+          <CardDescription>
+            The gateway connection must be online before the queue can register
+            your presence.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="rounded-md border border-border bg-muted/30 p-3">
+              <p className="text-xs uppercase text-muted-foreground">Socket</p>
+              <p className="truncate font-mono text-sm">{connectionState}</p>
+            </div>
+            <div className="rounded-md border border-border bg-muted/30 p-3">
+              <p className="text-xs uppercase text-muted-foreground">Wait</p>
+              <p className="font-mono text-sm">{waitTime}s</p>
+            </div>
+            <div className="rounded-md border border-border bg-muted/30 p-3">
+              <p className="text-xs uppercase text-muted-foreground">Position</p>
+              <p className="font-mono text-sm">{position ?? "..."}</p>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-border bg-card/60 p-4 text-sm text-muted-foreground">
+            {joining
+              ? "Registering you with matchmaking..."
+              : isConnected
+                ? "Searching for a compatible opponent. Keep this tab open."
+                : "Connecting to the websocket gateway..."}
+          </div>
+
+          {error && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex flex-wrap justify-between gap-2">
+          <Button variant="ghost" onClick={() => router.push("/dashboard")}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Dashboard
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => sync()} disabled={!isConnected}>
+              <RefreshCcw className="h-4 w-4" aria-hidden="true" />
+              Sync
+            </Button>
+            <Button variant="outline" onClick={leaveQueue}>
+              <XCircle className="h-4 w-4" aria-hidden="true" />
+              Leave
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+    </div>
+  );
 }

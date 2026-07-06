@@ -1,32 +1,21 @@
-import { api } from "./api";
-
-export type RegisterPayload = {
-  username: string;
-  email: string;
-  password: string;
-};
+import { authApi } from "@/lib/api";
+import { clearToken, setToken } from "@/lib/session";
+import type { RegisterPayload } from "@/lib/types";
 
 export async function login(email: string, password: string) {
-  const res = await api.post("/auth/login", {
-    email,        // ✅ MUST be email
-    password,
-  });
-
-  const token = res.data.token;
-  localStorage.setItem("token", token);
-
+  const { token } = await authApi.login({ email, password });
+  setToken(token);
   return token;
 }
 
 export async function register(data: RegisterPayload) {
-  const res = await api.post("/auth/register", data);
-  return res.data;
+  return authApi.register(data);
 }
 
 export async function logout() {
   try {
-    await api.post("/auth/logout");
+    await authApi.logout();
   } finally {
-    localStorage.removeItem("token");
+    clearToken();
   }
 }

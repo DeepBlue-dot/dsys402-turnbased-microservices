@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/services/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { register } = useAuth();
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -24,14 +26,10 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
     try {
-      await api.auth.register(form);
-      const res = await api.auth.login({ email: form.email, password: form.password });
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.user || { username: form.username, email: form.email }));
-
-      window.location.href = "/dashboard";
-    } catch (err: any) {
-      setError(err.message || "An unknown error occurred.");
+      await register(form);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred.");
     } finally {
       setLoading(false);
     }
@@ -88,6 +86,7 @@ export default function RegisterPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
+              <UserPlus className="h-4 w-4" aria-hidden="true" />
               {loading ? "Creating Account..." : "Register"}
             </Button>
           </form>
