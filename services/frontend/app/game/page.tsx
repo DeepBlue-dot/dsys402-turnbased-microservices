@@ -102,6 +102,9 @@ export default function GamePage() {
     matchId: null,
     board: [...emptyBoard],
   });
+  const gameRef = useRef<ActiveGameState | null>(null);
+  const gameOverRef = useRef<GameOverMessage["data"] | null>(null);
+  const lastProcessedMessageRef = useRef<string | null>(null);
 
   const recordEvent = useCallback((item: Omit<FeedItem, "id" | "at">) => {
     setFeed((current) => [
@@ -171,6 +174,14 @@ export default function GamePage() {
   }, [loading, router, user]);
 
   useEffect(() => {
+    gameRef.current = game;
+  }, [game]);
+
+  useEffect(() => {
+    gameOverRef.current = gameOver;
+  }, [gameOver]);
+
+  useEffect(() => {
     if (player?.game) {
       commitGame(player.game, { source: "profile" });
     }
@@ -179,6 +190,13 @@ export default function GamePage() {
   useEffect(() => {
     if (!lastMessage) return;
 
+    const signature = `${lastMessage.type}:${JSON.stringify(lastMessage.data ?? null)}`;
+    if (lastProcessedMessageRef.current === signature) {
+      return;
+    }
+    lastProcessedMessageRef.current = signature;
+
+    const currentGame = gameRef.current;
     const syncedGame = gameFromSync(lastMessage);
     if (syncedGame) {
       commitGame(syncedGame, {
@@ -193,12 +211,12 @@ export default function GamePage() {
     if (lastMessage.type === "MATCH_CREATED") {
       const matchGame: ActiveGameState = {
         matchId: lastMessage.data.matchId,
-        players: game?.players || [],
-        board: game?.board || [...emptyBoard],
-        turn: game?.turn || "",
-        mySymbol: game?.mySymbol || "X",
+        players: currentGame?.players || [],
+        board: currentGame?.board || [...emptyBoard],
+        turn: currentGame?.turn || "",
+        mySymbol: currentGame?.mySymbol || "X",
         status: "ACTIVE",
-        expiresAt: game?.expiresAt || Date.now(),
+        expiresAt: currentGame?.expiresAt || Date.now(),
         opponentId: lastMessage.data.opponentId,
       };
 
@@ -215,8 +233,8 @@ export default function GamePage() {
     if (lastMessage.type === "GAME_STARTED") {
       commitGame({
         matchId: lastMessage.data.matchId,
-        players: game?.players || [lastMessage.data.recipientId, lastMessage.data.opponentId],
-        board: game?.board || [...emptyBoard],
+        players: currentGame?.players || [lastMessage.data.recipientId, lastMessage.data.opponentId],
+        board: currentGame?.board || [...emptyBoard],
         turn: lastMessage.data.turn,
         mySymbol: lastMessage.data.mySymbol,
         status: "ACTIVE",
@@ -235,13 +253,13 @@ export default function GamePage() {
     if (lastMessage.type === "GAME_TURN") {
       commitGame({
         matchId: lastMessage.data.matchId,
-        players: game?.players || [],
+        players: currentGame?.players || [],
         board: normalizeBoard(lastMessage.data.board),
         turn: lastMessage.data.nextTurn,
-        mySymbol: game?.mySymbol || "X",
+        mySymbol: currentGame?.mySymbol || "X",
         status: "ACTIVE",
         expiresAt: lastMessage.data.expiresAt,
-        opponentId: game?.opponentId,
+        opponentId: currentGame?.opponentId,
       }, {
         source: "turn",
         recordMove: true,
@@ -261,9 +279,9 @@ export default function GamePage() {
 
     if (lastMessage.type === "GAME_OVER") {
       setGameOver(lastMessage.data);
-      if (game) {
+      if (currentGame) {
         commitGame({
-          ...game,
+          ...currentGame,
           board: normalizeBoard(lastMessage.data.finalBoard),
           status: "ENDED",
         }, {
@@ -289,7 +307,7 @@ export default function GamePage() {
           : data?.reason || lastMessage.message || "Gateway error.",
       );
     }
-  }, [commitGame, game, lastMessage, recordEvent, refreshUser]);
+  }, [commitGame, lastMessage, recordEvent, refreshUser]);
 
   useEffect(() => {
     if (!game?.expiresAt || gameOver) {
