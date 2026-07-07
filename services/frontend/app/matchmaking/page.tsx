@@ -16,7 +16,7 @@ import {
 import { matchmakingApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameSocket } from "@/hooks/useGameSocket";
-import type { CurrentPlayerState } from "@/lib/types";
+import type { CurrentPlayerState, PlayerStatus } from "@/lib/types";
 
 export default function MatchmakingPage() {
   const router = useRouter();
@@ -32,6 +32,7 @@ export default function MatchmakingPage() {
     clearNotice,
   } = useGameSocket(!!user);
   const requestedJoinRef = useRef(false);
+  const prevStatusRef = useRef<PlayerStatus>("OFFLINE");
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queueStartedAt, setQueueStartedAt] = useState<number | null>(null);
@@ -67,9 +68,15 @@ export default function MatchmakingPage() {
   useEffect(() => {
     if (liveStatus === "IN_GAME" || (livePlayer?.game && livePlayer.game.status === "ACTIVE")) {
       router.push("/game");
-    } else if (liveStatus === "IDLE" && requestedJoinRef.current && !joining) {
+    } else if (
+      liveStatus === "IDLE" &&
+      prevStatusRef.current === "QUEUED" &&
+      requestedJoinRef.current &&
+      !joining
+    ) {
       router.push("/dashboard");
     }
+    prevStatusRef.current = liveStatus;
   }, [liveStatus, livePlayer?.game, router, joining]);
 
   useEffect(() => {
@@ -77,6 +84,12 @@ export default function MatchmakingPage() {
 
     if (livePlayer?.status === "IN_GAME" || (livePlayer?.game && livePlayer.game.status === "ACTIVE")) {
       router.push("/game");
+      return;
+    }
+
+    if (livePlayer?.status === "QUEUED") {
+      requestedJoinRef.current = true;
+      setQueueStartedAt(Date.now());
       return;
     }
 

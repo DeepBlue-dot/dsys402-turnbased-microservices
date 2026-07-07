@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { authApi, playerApi } from "@/lib/api";
+import { authApi, playerApi, ApiError } from "@/lib/api";
 import { clearToken, getToken, setToken } from "@/lib/session";
 import type { CurrentPlayerState, LoginPayload, RegisterPayload } from "@/lib/types";
 
@@ -57,8 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Auth check failed";
       setError(message);
-      clearToken();
-      setPlayer(null);
+
+      // Only clear token and log out if it is a definitive 401 Unauthorized or 403 Forbidden.
+      // Other errors (e.g. 500, network offline) should not wipe the session.
+      const isAuthError = err instanceof ApiError && (err.status === 401 || err.status === 403);
+      if (isAuthError) {
+        clearToken();
+        setPlayer(null);
+      }
       return null;
     } finally {
       setLoading(false);
@@ -73,9 +79,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (payload: LoginPayload) => {
       setLoading(true);
       setError(null);
-      const { token } = await authApi.login(payload);
-      setToken(token);
-      return refreshUser();
+      try {
+        const { token } = await authApi.login(payload);
+        setToken(token);
+        return await refreshUser();
+      } catch (err) {
+        setLoading(false);
+        throw err;
+      }
     },
     [refreshUser],
   );

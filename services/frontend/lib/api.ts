@@ -38,6 +38,16 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+export class ApiError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 api.interceptors.response.use(
   (res) => res,
   (error) => {
@@ -47,7 +57,7 @@ api.interceptors.response.use(
       error.message ||
       "Request failed";
 
-    return Promise.reject(new Error(message));
+    return Promise.reject(new ApiError(message, error.response?.status));
   },
 );
 
@@ -172,7 +182,15 @@ export const historyApi = {
 };
 
 export function getWebSocketUrl(token: string) {
-  const url = new URL(backendOrigin || "http://127.0.0.1");
+  let origin = backendOrigin;
+  if (!origin && typeof window !== "undefined") {
+    if (window.location.port === "3000") {
+      origin = "http://127.0.0.1";
+    } else {
+      origin = window.location.origin;
+    }
+  }
+  const url = new URL(origin || "http://127.0.0.1");
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   url.pathname = "/ws";
   url.searchParams.set("token", token);
