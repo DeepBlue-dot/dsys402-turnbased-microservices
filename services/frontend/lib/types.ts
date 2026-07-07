@@ -19,6 +19,7 @@ export type RegisterPayload = {
   username: string;
   email: string;
   password: string;
+  confirmPassword: string;
 };
 
 export type LoginPayload = {
@@ -299,6 +300,17 @@ export type GameDrawDeclinedMessage = {
   timestamp?: string;
 };
 
+export type PlayerRatingUpdatedMessage = {
+  type: "PLAYER_RATING_UPDATED";
+  data: {
+    recipientId: string;
+    matchId: string;
+    ratingChange: number;
+    newRating: number;
+  };
+  timestamp?: string;
+};
+
 export type GameSocketMessage =
   | ConnectSyncMessage
   | QueueJoinedMessage
@@ -313,7 +325,8 @@ export type GameSocketMessage =
   | AckMessage
   | ErrorMessage
   | GameDrawProposedMessage
-  | GameDrawDeclinedMessage;
+  | GameDrawDeclinedMessage
+  | PlayerRatingUpdatedMessage;
 
 export type OutgoingSocketMessage =
   | {

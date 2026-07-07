@@ -49,6 +49,10 @@ export const handleEvents = async (event: {
       await handleMatchEnded(event.data);
       break;
 
+    case "player.rating.updated":
+      await handlePlayerRatingUpdated(event.data);
+      break;
+
     case "matchmaking.joined":
       sendToUser(event.data.userId, { type: "QUEUE_JOINED", data: event.data });
       break;
@@ -112,6 +116,18 @@ const handleMatchEnded = async (payload: {
 }) => {
   sendToUser(payload.recipientId, {
     type: "GAME_OVER",
+    data: payload,
+  });
+};
+
+const handlePlayerRatingUpdated = async (payload: {
+  recipientId: string;
+  matchId: string;
+  ratingChange: number;
+  newRating: number;
+}) => {
+  sendToUser(payload.recipientId, {
+    type: "PLAYER_RATING_UPDATED",
     data: payload,
   });
 };

@@ -38,6 +38,11 @@ type GameSocketContextValue = {
   feed: FeedItem[];
   chat: ChatItem[];
   gameOverState: GameOverMessage["data"] | null;
+  ratingUpdate: {
+    matchId: string;
+    ratingChange: number;
+    newRating: number;
+  } | null;
   notice: string | null;
   clearNotice: () => void;
   sendChatMessage: (text: string) => boolean;
@@ -64,6 +69,7 @@ export function GameSocketProvider({ children }: { children: ReactNode }) {
     feed: socketState.feed,
     chat: socketState.chat,
     gameOverState: socketState.gameOverState,
+    ratingUpdate: socketState.ratingUpdate,
     notice: socketState.notice,
     clearNotice: socketState.clearNotice,
     sendChatMessage: socketState.sendChatMessage,

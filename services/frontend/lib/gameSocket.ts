@@ -46,6 +46,11 @@ export type GameSocketControllerValue = {
   feed: FeedItem[];
   chat: ChatItem[];
   gameOverState: GameOverMessage["data"] | null;
+  ratingUpdate: {
+    matchId: string;
+    ratingChange: number;
+    newRating: number;
+  } | null;
   notice: string | null;
   clearNotice: () => void;
   sendChatMessage: (text: string) => boolean;
@@ -70,6 +75,11 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [chat, setChat] = useState<ChatItem[]>([]);
   const [gameOverState, setGameOverState] = useState<GameOverMessage["data"] | null>(null);
+  const [ratingUpdate, setRatingUpdate] = useState<{
+    matchId: string;
+    ratingChange: number;
+    newRating: number;
+  } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const liveGameRef = useRef<ActiveGameState | null>(null);
@@ -173,6 +183,7 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
     setFeed([]);
     setChat([]);
     setGameOverState(null);
+    setRatingUpdate(null);
     setNotice(null);
   }, []);
 
@@ -189,6 +200,7 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
             setLiveGame(data.game);
             if (data.game) {
               setGameOverState(null);
+              setRatingUpdate(null);
             }
           }
           break;
@@ -211,6 +223,7 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
           setLiveStatus("IN_GAME");
           setLiveQueue(null);
           setGameOverState(null);
+          setRatingUpdate(null);
           setChat([]);
           setLiveGame({
             matchId: message.data.matchId,
@@ -240,6 +253,7 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
           setLiveStatus("IN_GAME");
           setLiveQueue(null);
           setGameOverState(null);
+          setRatingUpdate(null);
           setChat([]);
           setLiveGame({
             matchId: message.data.matchId,
@@ -358,6 +372,12 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
         case "CHAT_MESSAGE": {
           const isFromMe = message.data.from === userId;
           addChatItem(isFromMe ? "me" : "opponent", message.data.text, "sent");
+          break;
+        }
+        case "PLAYER_RATING_UPDATED": {
+          if (liveGameRef.current?.matchId === message.data.matchId) {
+            setRatingUpdate(message.data);
+          }
           break;
         }
         case "chat.status": {
@@ -500,6 +520,7 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
     feed,
     chat,
     gameOverState,
+    ratingUpdate,
     notice,
     clearNotice,
     sendChatMessage,
@@ -517,6 +538,7 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
     liveQueue,
     liveStatus,
     notice,
+    ratingUpdate,
     send,
     sendChatMessage,
     sync,

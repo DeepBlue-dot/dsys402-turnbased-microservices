@@ -24,7 +24,7 @@ function StatusPill({ status }: { status: string }) {
         styles[status] || styles.OFFLINE,
       )}
     >
-      {status.replace("_", " ")}
+      {status === "IDLE" ? "online" : status.replace("_", " ")}
     </span>
   );
 }

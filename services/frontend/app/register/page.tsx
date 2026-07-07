@@ -17,6 +17,7 @@ export default function RegisterPage() {
     username: "",
     email: "",
     password: "",
+    confirmPassword: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,6 +26,11 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match");
+      setLoading(false);
+      return;
+    }
     try {
       await register(form);
       router.push("/dashboard");
@@ -82,6 +88,17 @@ export default function RegisterPage() {
                 placeholder="••••••••"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                value={form.confirmPassword}
+                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
                 required
               />
             </div>

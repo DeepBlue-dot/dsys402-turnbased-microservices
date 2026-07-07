@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowLeft,
   Clock3,
@@ -61,6 +62,7 @@ function initials(name: string) {
 
 function formatStatus(status?: string) {
   if (!status) return "Offline";
+  if (status === "IDLE") return "online";
   return status.replaceAll("_", " ").toLowerCase();
 }
 
@@ -94,6 +96,7 @@ function PlayerPanel({
   align = "left",
   label,
   name,
+  playerId,
   rating,
   record,
   status,
@@ -103,6 +106,7 @@ function PlayerPanel({
   align?: "left" | "right";
   label: string;
   name: string;
+  playerId?: string;
   rating: number;
   record: string;
   status: string;
@@ -121,13 +125,26 @@ function PlayerPanel({
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted/30 font-bold">
           {name === "Waiting for opponent" ? (
             <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+          ) : playerId ? (
+            <Link href={`/users/${playerId}`} className="hover:text-primary transition-colors">
+              {initials(name)}
+            </Link>
           ) : (
             initials(name)
           )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-xs uppercase text-muted-foreground">{label}</p>
-          <p className="mt-1 truncate text-lg font-semibold">{name}</p>
+          {playerId && name !== "Waiting for opponent" ? (
+            <Link
+              href={`/users/${playerId}`}
+              className="mt-1 block truncate text-lg font-bold hover:text-primary hover:underline transition-colors"
+            >
+              {name}
+            </Link>
+          ) : (
+            <p className="mt-1 truncate text-lg font-semibold">{name}</p>
+          )}
           <div className={cn(
             "mt-2 flex flex-wrap gap-2",
             align === "right" && "justify-end",
@@ -164,7 +181,6 @@ function PlayerPanel({
 
 export default function GamePage() {
   const router = useRouter();
-  const { loading, player, user } = useAuth();
   const {
     connectionState,
     error: socketError,
@@ -176,6 +192,7 @@ export default function GamePage() {
     feed,
     chat,
     gameOverState: gameOver,
+    ratingUpdate,
     notice,
     sendChatMessage,
   } = useGameSocket(!!user);
@@ -190,12 +207,6 @@ export default function GamePage() {
       router.push("/login");
     }
   }, [loading, router, user]);
-
-  useEffect(() => {
-    if (liveStatus === "IDLE" && !gameOver) {
-      router.push("/dashboard");
-    }
-  }, [liveStatus, gameOver, router]);
 
   useEffect(() => {
     if (!game?.expiresAt || gameOver) {
@@ -348,39 +359,6 @@ export default function GamePage() {
     );
   }
 
-  if (!game) {
-    return (
-      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
-        <Card className="w-full max-w-md text-center">
-          <CardContent className="space-y-5 pt-6">
-            <ShieldAlert className="mx-auto h-10 w-10 text-muted-foreground" aria-hidden="true" />
-            <div>
-              <h1 className="text-2xl font-bold">No Active Match</h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Connect to the gateway or enter matchmaking to start a round.
-              </p>
-            </div>
-            {socketError && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                {socketError}
-              </div>
-            )}
-            <div className="flex justify-center gap-2">
-              <Button variant="outline" onClick={() => sync()} disabled={!isConnected}>
-                <RefreshCcw className="h-4 w-4" aria-hidden="true" />
-                Sync
-              </Button>
-              <Button onClick={() => router.push("/matchmaking")}>
-                <Play className="h-4 w-4" aria-hidden="true" />
-                Find Match
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto grid min-h-[calc(100vh-7rem)] w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="flex min-w-0 flex-col justify-center gap-5">
@@ -398,7 +376,7 @@ export default function GamePage() {
               </span>
               <span className="inline-flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-muted-foreground">
                 <Swords className="h-3.5 w-3.5" aria-hidden="true" />
-                Match {shortId(game.matchId)}
+                Match {game ? shortId(game.matchId) : "None"}
               </span>
             </div>
             <div>
@@ -415,14 +393,14 @@ export default function GamePage() {
               <RefreshCcw className="h-4 w-4" aria-hidden="true" />
               Sync
             </Button>
-            <Button variant="outline" onClick={forfeit} disabled={!!gameOver}>
+            <Button variant="outline" onClick={forfeit} disabled={!game || !!gameOver}>
               <Flag className="h-4 w-4" aria-hidden="true" />
               Forfeit
             </Button>
             <Button
               variant="outline"
               onClick={proposeDraw}
-              disabled={!!gameOver || !isConnected || !!game.drawProposedBy}
+              disabled={!game || !!gameOver || !isConnected || !!game.drawProposedBy}
             >
               <Handshake className="h-4 w-4" aria-hidden="true" />
               Propose Draw
@@ -430,25 +408,25 @@ export default function GamePage() {
           </div>
         </div>
 
-        {game.drawProposedBy && (
+        {game?.drawProposedBy && (
           <div className="flex flex-col gap-4 rounded-md border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between animate-pulse">
             <div className="flex items-center gap-2">
               <Handshake className="h-5 w-5 text-amber-500" />
               <div>
                 <p className="text-sm font-semibold text-foreground">
-                  {game.drawProposedBy === user.id
+                  {game.drawProposedBy === user?.id
                     ? "Draw offer pending"
                     : "Draw offered by opponent"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {game.drawProposedBy === user.id
+                  {game.drawProposedBy === user?.id
                     ? "Waiting for opponent response..."
                     : "Would you like to accept the draw?"}
                 </p>
               </div>
             </div>
             <div className="flex gap-2">
-              {game.drawProposedBy !== user.id ? (
+              {game.drawProposedBy !== user?.id ? (
                 <>
                   <Button size="sm" onClick={confirmDraw} className="bg-amber-600 hover:bg-amber-700 text-white">
                     Accept
@@ -470,10 +448,11 @@ export default function GamePage() {
           <PlayerPanel
             label="You"
             name={currentPlayerName}
+            playerId={user?.id}
             rating={currentPlayerRating}
             record={formatRecord(currentPlayerStats)}
             status={liveStatus !== "OFFLINE" ? liveStatus : (player?.status || user.status)}
-            symbol={game.mySymbol}
+            symbol={game?.mySymbol || "X"}
             supporting={player?.profile?.bio || "Ready in this match"}
           />
           <div className="rounded-md border border-border bg-card p-3 text-center">
@@ -488,6 +467,7 @@ export default function GamePage() {
             align="right"
             label="Opponent"
             name={opponentLabel}
+            playerId={opponentId}
             rating={opponentRating}
             record={formatRecord(opponentInfo?.stats)}
             status={opponentStatus}
@@ -560,7 +540,13 @@ export default function GamePage() {
                 >
                   <p>{item.text}</p>
                   <p className="mt-1 font-mono text-[10px] uppercase text-muted-foreground">
-                    {item.from === "me" ? "You" : item.from === "opponent" ? opponentLabel : "System"} · {item.at}
+                    {item.from === "me" ? (
+                      <Link href={`/users/${user?.id}`} className="hover:underline hover:text-primary transition-colors">You</Link>
+                    ) : item.from === "opponent" && opponentId ? (
+                      <Link href={`/users/${opponentId}`} className="hover:underline hover:text-primary transition-colors">{opponentLabel}</Link>
+                    ) : (
+                      "System"
+                    )} · {item.at}
                     {item.status === "pending" ? " · sending" : ""}
                     {item.status === "failed" ? " · failed" : ""}
                   </p>
@@ -624,61 +610,129 @@ export default function GamePage() {
           )}
         </div>
 
-        {gameOver && (
-          <div className="rounded-md border border-primary/30 bg-primary/10 p-4">
-            <p className="text-sm uppercase text-muted-foreground">Match complete</p>
-            <h2 className="mt-1 text-3xl font-bold">{gameOver.result}</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Ended by {formatReason(gameOver.reason) || "completion"}.
-            </p>
-            <div className="mt-4 grid gap-2">
-              <Button onClick={() => router.push("/matchmaking")}>
-                <Play className="h-4 w-4" aria-hidden="true" />
-                Find Another Match
-              </Button>
-              <Button variant="outline" onClick={() => router.push(`/history/${game.matchId}`)}>
-                <History className="h-4 w-4" aria-hidden="true" />
-                View Match Detail
-              </Button>
-              <Button variant="ghost" onClick={() => router.push("/dashboard")}>
-                Dashboard
-              </Button>
-            </div>
-          </div>
-        )}
       </aside>
 
-      {gameOver && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 p-4 backdrop-blur lg:hidden">
-          <Card className="w-full max-w-md text-center">
-            <CardContent className="space-y-5 pt-6">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-md border border-primary/30 bg-primary/10">
-                {gameOver.result === "WIN" ? (
-                  <span className="text-3xl font-black text-primary">{game.mySymbol}</span>
-                ) : gameOver.result === "LOSS" ? (
-                  <span className="text-3xl font-black text-accent">{opponentSymbol}</span>
-                ) : (
-                  <Handshake className="h-8 w-8 text-amber-500 animate-bounce" aria-hidden="true" />
-                )}
-              </div>
-              <div>
-                <p className="text-sm uppercase text-muted-foreground">Match Complete</p>
-                <h2 className="text-3xl font-bold">{gameOver.result}</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Ended by {formatReason(gameOver.reason) || "completion"}.
-                </p>
-              </div>
-              <div className="grid gap-2">
-                <Button onClick={() => router.push("/matchmaking")}>
-                  Next Match
-                </Button>
-                <Button variant="outline" onClick={() => router.push(`/history/${game.matchId}`)}>
-                  View Details
-                </Button>
-                <Button variant="ghost" onClick={() => router.push("/dashboard")}>
-                  Dashboard
-                </Button>
-              </div>
+      {/* Premium Glassmorphic Overlay Popup for No Game or Game Over states */}
+      {(!game || gameOver) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-md animate-in fade-in duration-300">
+          <Card className="relative w-full max-w-md overflow-hidden border border-border/80 bg-card/60 backdrop-blur-xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+            {/* Ambient Background Glow */}
+            <div className="absolute -right-16 -top-16 h-36 w-36 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
+            <div className="absolute -left-16 -bottom-16 h-36 w-36 rounded-full bg-accent/10 blur-2xl pointer-events-none" />
+
+            <CardContent className="space-y-6 pt-4 flex flex-col items-center">
+              {!game ? (
+                // Case: No Active Game
+                <>
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-border/80 bg-muted/40 text-muted-foreground shadow-inner">
+                    <Swords className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-black tracking-tight text-foreground">No Active Match</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Connect to the gateway or enter matchmaking to start a round.
+                    </p>
+                  </div>
+                  {socketError && (
+                    <div className="w-full rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
+                      {socketError}
+                    </div>
+                  )}
+                  <div className="w-full grid gap-2">
+                    <Button onClick={() => router.push("/matchmaking")} className="w-full bg-primary hover:bg-primary/95 text-primary-foreground font-bold tracking-wide shadow-md shadow-primary/20 transition-all duration-200">
+                      <Play className="mr-2 h-4 w-4 fill-current" aria-hidden="true" />
+                      Find Match
+                    </Button>
+                    <Button variant="outline" onClick={() => sync()} disabled={!isConnected} className="w-full border-border/80 bg-muted/30 hover:bg-muted/50 font-bold transition-all duration-200">
+                      <RefreshCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+                      Sync State
+                    </Button>
+                    <Button variant="ghost" onClick={() => router.push("/dashboard")} className="w-full text-muted-foreground hover:text-foreground font-bold transition-all duration-200">
+                      Go to Dashboard
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                // Case: Game Over
+                <>
+                  <div className="mx-auto animate-in zoom-in duration-300">
+                    {gameOver.result === "WIN" ? (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10 animate-bounce">
+                        <span className="text-4xl font-black">{game.mySymbol}</span>
+                      </div>
+                    ) : gameOver.result === "LOSS" ? (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10 border border-destructive/30 text-destructive shadow-lg shadow-destructive/10">
+                        <span className="text-4xl font-black">{opponentSymbol}</span>
+                      </div>
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 shadow-lg shadow-amber-500/10">
+                        <Handshake className="h-10 w-10 text-amber-400" aria-hidden="true" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 select-none">
+                      Match Complete
+                    </p>
+                    <h2 className={cn(
+                      "text-4xl font-black tracking-tighter",
+                      gameOver.result === "WIN" && "text-emerald-400 drop-shadow-[0_2px_10px_rgba(16,185,129,0.15)]",
+                      gameOver.result === "LOSS" && "text-destructive drop-shadow-[0_2px_10px_rgba(239,68,68,0.15)]",
+                      gameOver.result === "DRAW" && "text-amber-400 drop-shadow-[0_2px_10px_rgba(245,158,11,0.15)]"
+                    )}>
+                      {gameOver.result}
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ended by {formatReason(gameOver.reason) || "completion"}.
+                    </p>
+                  </div>
+
+                  {/* Rating Update Display */}
+                  <div className="w-full py-4 px-6 rounded-2xl bg-muted/30 border border-border/80 shadow-inner flex flex-col items-center justify-center gap-1">
+                    <p className="text-xs text-muted-foreground font-semibold">Rating Update</p>
+                    {ratingUpdate ? (
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-base text-muted-foreground/80 select-none">
+                          {ratingUpdate.newRating - ratingUpdate.ratingChange}
+                        </span>
+                        <span className="text-xs text-muted-foreground/40">→</span>
+                        <span className="font-mono text-lg font-black text-foreground">
+                          {ratingUpdate.newRating}
+                        </span>
+                        <span className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold font-mono shadow-sm",
+                          ratingUpdate.ratingChange > 0 && "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400",
+                          ratingUpdate.ratingChange < 0 && "bg-destructive/10 border border-destructive/20 text-destructive",
+                          ratingUpdate.ratingChange === 0 && "bg-muted border border-border text-muted-foreground"
+                        )}>
+                          {ratingUpdate.ratingChange >= 0 ? "+" : ""}{ratingUpdate.ratingChange}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 mt-1">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                        <span className="text-xs text-muted-foreground select-none animate-pulse">
+                          Calculating rating change...
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="w-full grid gap-2">
+                    <Button onClick={() => router.push("/matchmaking")} className="w-full bg-primary hover:bg-primary/95 text-primary-foreground font-bold tracking-wide shadow-md shadow-primary/20 transition-all duration-200">
+                      Next Match
+                    </Button>
+                    <Button variant="outline" onClick={() => router.push(`/history/${game.matchId}`)} className="w-full border-border/80 bg-muted/30 hover:bg-muted/50 font-bold transition-all duration-200">
+                      <History className="mr-2 h-4 w-4" aria-hidden="true" />
+                      View Match Details
+                    </Button>
+                    <Button variant="ghost" onClick={() => router.push("/dashboard")} className="w-full text-muted-foreground hover:text-foreground font-bold transition-all duration-200">
+                      Back to Dashboard
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

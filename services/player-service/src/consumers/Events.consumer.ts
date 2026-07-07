@@ -144,7 +144,7 @@ const handlePlayerDisconnected = async (payload: { userId: string }) => {
  */
 
 const handleMatchEnded = async (payload: MatchEndedPayload) => {
-  const { players, winnerId, reason } = payload;
+  const { players, winnerId, reason, matchId } = payload;
 
   // Determine loserId and isDraw for Elo calculation
   const isDraw = winnerId === null;
@@ -152,20 +152,32 @@ const handleMatchEnded = async (payload: MatchEndedPayload) => {
 
   try {
     const results = await prisma.$transaction(async (tx) => {
-      // Only update Elo if not a draw
-      if (!isDraw) {
-        const [winnerStats, loserStats] = await Promise.all([
-          tx.playerStats.findUnique({ where: { playerId: winnerId } }),
-          tx.playerStats.findUnique({ where: { playerId: loserId } }),
-        ]);
+      // Find current stats of all players
+      const playerStatsList = await Promise.all(
+        players.map((pid) => tx.playerStats.findUnique({ where: { playerId: pid } }))
+      );
 
-        if (!winnerStats || !loserStats) throw new Error("Stats not found");
+      if (playerStatsList.some((s) => !s)) {
+        throw new Error("Stats not found for one or more players");
+      }
+
+      const statsMap = new Map(playerStatsList.map((s) => [s!.playerId, s!]));
+
+      const p1Id = players[0];
+      const p2Id = players[1];
+      const p1Stats = statsMap.get(p1Id)!;
+      const p2Stats = statsMap.get(p2Id)!;
+
+      if (!isDraw) {
+        const isP1Winner = winnerId === p1Id;
+        const winnerStats = isP1Winner ? p1Stats : p2Stats;
+        const loserStats = isP1Winner ? p2Stats : p1Stats;
 
         const ratings = calculateElo(winnerStats.rating, loserStats.rating);
 
         await Promise.all([
           tx.playerStats.update({
-            where: { playerId: winnerId },
+            where: { playerId: winnerId! },
             data: { wins: { increment: 1 }, rating: ratings.winnerNewRating },
           }),
           tx.playerStats.update({
@@ -174,36 +186,56 @@ const handleMatchEnded = async (payload: MatchEndedPayload) => {
           }),
         ]);
 
-        return ratings;
+        return {
+          p1NewRating: isP1Winner ? ratings.winnerNewRating : ratings.loserNewRating,
+          p1OldRating: p1Stats.rating,
+          p2NewRating: isP1Winner ? ratings.loserNewRating : ratings.winnerNewRating,
+          p2OldRating: p2Stats.rating,
+        };
       } else {
         // Draw: increment draws for all players
         await tx.playerStats.updateMany({
           where: { playerId: { in: players } },
           data: { draws: { increment: 1 } },
         });
-        return { winnerNewRating: 0, loserNewRating: 0 };
+
+        return {
+          p1NewRating: p1Stats.rating,
+          p1OldRating: p1Stats.rating,
+          p2NewRating: p2Stats.rating,
+          p2OldRating: p2Stats.rating,
+        };
       }
     });
 
-    // --- Optional Redis Update ---
-    const syncRedis = async (id: string, newRating: number) => {
+    const p1Id = players[0];
+    const p2Id = players[1];
+
+    const syncRedisAndPublish = async (id: string, newRating: number, ratingChange: number) => {
       const key = `presence:${id}`;
+      let instanceId: string | null = null;
       if (await redis.exists(key)) {
+        const fields = await redis.hmget(key, "instanceId");
+        instanceId = fields[0];
         await redis.hset(key, {
           rating: newRating.toString(),
           status: "IDLE",
         });
       }
+      if (instanceId) {
+        await publishEvent(`player.rating.updated.${instanceId}`, {
+          recipientId: id,
+          matchId,
+          ratingChange,
+          newRating,
+        });
+      }
     };
 
-    if (!isDraw) {
-      await Promise.all([
-        syncRedis(winnerId!, results.winnerNewRating),
-        syncRedis(loserId, results.loserNewRating),
-      ]);
-    } else {
-      await Promise.all(players.map((id) => syncRedis(id, 0)));
-    }
+    await Promise.all([
+      syncRedisAndPublish(p1Id, results.p1NewRating, results.p1NewRating - results.p1OldRating),
+      syncRedisAndPublish(p2Id, results.p2NewRating, results.p2NewRating - results.p2OldRating),
+    ]);
   } catch (err) {
     console.error("[Match] Transaction failed:", err);
     throw err;

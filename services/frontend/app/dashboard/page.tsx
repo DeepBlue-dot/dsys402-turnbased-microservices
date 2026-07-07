@@ -39,7 +39,7 @@ function StatusPill({ status }: { status: PlayerStatus | string }) {
         styles[status] || styles.OFFLINE,
       )}
     >
-      {status.replace("_", " ")}
+      {status === "IDLE" ? "online" : status.replace("_", " ")}
     </span>
   );
 }
