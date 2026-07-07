@@ -1,13 +1,18 @@
 import axios from "axios";
 import { getToken } from "@/lib/session";
 import type {
+  AuthLogoutResponse,
+  AuthRefreshResponse,
   AuthTokenResponse,
   CurrentPlayerState,
   LoginPayload,
   MatchHistoryResponse,
   MatchDetail,
+  PlayerSearchResponse,
+  PlayerStats,
   PublicPlayerInfo,
   RegisterPayload,
+  RegisteredPlayer,
 } from "@/lib/types";
 
 export const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN?.replace(
@@ -48,7 +53,7 @@ api.interceptors.response.use(
 
 export const authApi = {
   async register(payload: RegisterPayload) {
-    const res = await api.post("/auth/register", payload);
+    const res = await api.post<RegisteredPlayer>("/auth/register", payload);
     return res.data;
   },
 
@@ -70,12 +75,12 @@ export const authApi = {
   },
 
   async logout() {
-    const res = await api.post<{ message: string }>("/auth/logout");
+    const res = await api.post<AuthLogoutResponse>("/auth/logout");
     return res.data;
   },
 
   async refresh() {
-    const res = await api.post<AuthTokenResponse>("/auth/refresh");
+    const res = await api.post<AuthRefreshResponse>("/auth/refresh");
     return res.data;
   },
 };
@@ -86,8 +91,20 @@ export const playerApi = {
     return res.data;
   },
 
+  async search(params?: { page?: number; limit?: number; search?: string }) {
+    const res = await api.get<PlayerSearchResponse>("/player/search", {
+      params,
+    });
+    return res.data;
+  },
+
   async publicProfile(playerId: string) {
     const res = await api.get<PublicPlayerInfo>(`/player/${playerId}/profile`);
+    return res.data;
+  },
+
+  async publicStats(playerId: string) {
+    const res = await api.get<PlayerStats>(`/player/${playerId}/stats`);
     return res.data;
   },
 

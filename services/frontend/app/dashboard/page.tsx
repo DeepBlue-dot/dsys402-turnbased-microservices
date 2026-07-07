@@ -20,21 +20,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useGameSocket } from "@/hooks/useGameSocket";
 import type {
   CurrentPlayerState,
-  GameSocketMessage,
   MatchHistoryItem,
   PlayerStatus,
 } from "@/lib/types";
-
-function getSyncState(message: GameSocketMessage | null) {
-  if (
-    message?.type === "CONNECT_SYNC" ||
-    message?.type === "SYNC_RESPONSE"
-  ) {
-    return message.data;
-  }
-
-  return null;
-}
 
 function StatusPill({ status }: { status: PlayerStatus | string }) {
   const styles: Record<string, string> = {
@@ -59,30 +47,41 @@ function StatusPill({ status }: { status: PlayerStatus | string }) {
 export default function DashboardPage() {
   const router = useRouter();
   const { loading, logout, player, refreshUser, user } = useAuth();
-  const { connectionState, isConnected, lastMessage, sync } = useGameSocket(
-    !!user,
-  );
+  const {
+    connectionState,
+    isConnected,
+    sync,
+    liveStatus,
+    liveQueue,
+    liveGame,
+  } = useGameSocket(!!user);
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
-  const syncState = getSyncState(lastMessage);
 
   const livePlayer = useMemo<CurrentPlayerState | null>(() => {
     if (!player) return null;
 
     return {
       ...player,
-      ...syncState,
-      game: syncState?.game || player.game,
-      queue: syncState?.queue || player.queue,
-      status: (syncState?.status as PlayerStatus | undefined) || player.status,
+      game: liveGame || player.game,
+      queue: liveQueue || player.queue,
+      status: liveStatus !== "OFFLINE" ? liveStatus : player.status,
     };
-  }, [player, syncState]);
+  }, [player, liveGame, liveQueue, liveStatus]);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
     }
   }, [loading, router, user]);
+
+  useEffect(() => {
+    if (liveStatus === "IN_GAME") {
+      router.push("/game");
+    } else if (liveStatus === "QUEUED") {
+      router.push("/matchmaking");
+    }
+  }, [liveStatus, router]);
 
   useEffect(() => {
     if (isConnected) {

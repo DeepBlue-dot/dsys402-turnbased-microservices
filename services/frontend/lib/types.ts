@@ -7,6 +7,14 @@ export type AuthTokenResponse = {
   token: string;
 };
 
+export type AuthRefreshResponse = {
+  token: string;
+};
+
+export type AuthLogoutResponse = {
+  message: string;
+};
+
 export type RegisterPayload = {
   username: string;
   email: string;
@@ -23,6 +31,13 @@ export type PlayerStats = {
   wins: number;
   losses: number;
   draws: number;
+};
+
+export type RegisteredPlayer = {
+  id: string;
+  email: string;
+  profile?: Pick<PlayerProfile, "username"> | null;
+  stats?: Pick<PlayerStats, "rating"> | null;
 };
 
 export type PlayerProfile = {
@@ -58,6 +73,28 @@ export type CurrentPlayerState = {
   lastOnline?: string | null;
   queue?: QueueState;
   game?: ActiveGameState;
+};
+
+export type PlayerSearchItem = {
+  id: string;
+  email: string;
+  username?: string | null;
+  avatarUrl?: string | null;
+  bio?: string | null;
+  stats?: PlayerStats | null;
+  createdAt?: string;
+  updateAt?: string;
+  lastOnline?: string | null;
+};
+
+export type PlayerSearchResponse = {
+  data: PlayerSearchItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 };
 
 export type PublicPlayerInfo = {
@@ -281,3 +318,20 @@ export type OutgoingSocketMessage =
       matchId: string;
       text: string;
     };
+
+export type FeedItem = {
+  id: string;
+  at: string;
+  title: string;
+  detail: string;
+  symbol?: GameSymbol;
+};
+
+export type ChatItem = {
+  id: string;
+  at: string;
+  from: "me" | "opponent" | "system";
+  text: string;
+  status?: "sent" | "failed" | "pending";
+};
+

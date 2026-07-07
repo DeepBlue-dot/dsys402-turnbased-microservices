@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -27,10 +27,7 @@ import { playerApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameSocket } from "@/hooks/useGameSocket";
 import type {
-  ActiveGameState,
   BoardCell,
-  GameOverMessage,
-  GameSocketMessage,
   GameSymbol,
   PlayerStats,
   PublicPlayerInfo,
@@ -38,36 +35,9 @@ import type {
 
 const emptyBoard: BoardCell[] = Array(9).fill("") as BoardCell[];
 
-type FeedItem = {
-  id: string;
-  at: string;
-  title: string;
-  detail: string;
-  symbol?: GameSymbol;
-};
-
-type ChatItem = {
-  id: string;
-  at: string;
-  from: "me" | "opponent" | "system";
-  text: string;
-  status?: "sent" | "failed" | "pending";
-};
-
 function normalizeBoard(board?: BoardCell[]) {
   if (!board || board.length !== 9) return [...emptyBoard];
   return board.map((cell) => (cell === "X" || cell === "O" ? cell : "")) as BoardCell[];
-}
-
-function gameFromSync(message: GameSocketMessage | null) {
-  if (
-    (message?.type === "CONNECT_SYNC" || message?.type === "SYNC_RESPONSE") &&
-    message.data.game
-  ) {
-    return message.data.game;
-  }
-
-  return null;
 }
 
 function formatReason(reason?: string) {
@@ -117,24 +87,7 @@ function formatLastOnline(value?: string | null) {
   })}`;
 }
 
-function cellName(position: number) {
-  const row = Math.floor(position / 3) + 1;
-  const column = (position % 3) + 1;
-  return `row ${row}, column ${column}`;
-}
 
-function findNewMove(previous: BoardCell[], next: BoardCell[]) {
-  for (let index = 0; index < next.length; index += 1) {
-    if (!previous[index] && next[index]) {
-      return {
-        position: index,
-        symbol: next[index] as GameSymbol,
-      };
-    }
-  }
-
-  return null;
-}
 
 function PlayerPanel({
   align = "left",
@@ -210,108 +163,26 @@ function PlayerPanel({
 
 export default function GamePage() {
   const router = useRouter();
-  const { loading, player, refreshUser, user } = useAuth();
+  const { loading, player, user } = useAuth();
   const {
     connectionState,
     error: socketError,
     isConnected,
-    lastMessage,
     send,
     sync,
+    liveStatus,
+    liveGame: game,
+    feed,
+    chat,
+    gameOverState: gameOver,
+    notice,
+    sendChatMessage,
   } = useGameSocket(!!user);
-  const [game, setGame] = useState<ActiveGameState | null>(null);
-  const [gameOver, setGameOver] = useState<GameOverMessage["data"] | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [feed, setFeed] = useState<FeedItem[]>([]);
-  const [chat, setChat] = useState<ChatItem[]>([]);
   const [chatText, setChatText] = useState("");
   const [opponentInfo, setOpponentInfo] = useState<PublicPlayerInfo | null>(null);
-  const boardRef = useRef<{ matchId: string | null; board: BoardCell[] }>({
-    matchId: null,
-    board: [...emptyBoard],
-  });
-  const gameRef = useRef<ActiveGameState | null>(null);
-  const gameOverRef = useRef<GameOverMessage["data"] | null>(null);
-  const lastProcessedMessageRef = useRef<string | null>(null);
   const opponentId = game?.opponentId ||
     game?.players.find((playerId) => playerId !== user?.id);
-
-  const recordEvent = useCallback((item: Omit<FeedItem, "id" | "at">) => {
-    setFeed((current) => [
-      {
-        ...item,
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        at: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-      },
-      ...current,
-    ].slice(0, 8));
-  }, []);
-
-  const recordChat = useCallback((item: Omit<ChatItem, "id" | "at">) => {
-    setChat((current) => [
-      ...current,
-      {
-        ...item,
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        at: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      },
-    ].slice(-30));
-  }, []);
-
-  const commitGame = useCallback((
-    nextGame: ActiveGameState,
-    options: {
-      source: "profile" | "sync" | "match" | "turn" | "over";
-      recordMove?: boolean;
-      eventTitle?: string;
-      eventDetail?: string;
-    },
-  ) => {
-    const normalizedGame = {
-      ...nextGame,
-      board: normalizeBoard(nextGame.board),
-    };
-    const previous = boardRef.current;
-    const isSameMatch = previous.matchId === normalizedGame.matchId;
-
-    if (!isSameMatch) {
-      setFeed([]);
-      setChat([]);
-    }
-
-    if (options.recordMove && isSameMatch) {
-      const move = findNewMove(previous.board, normalizedGame.board);
-
-      if (move) {
-        recordEvent({
-          title: `${move.symbol} placed a mark`,
-          detail: `Cell ${move.position + 1}, ${cellName(move.position)}`,
-          symbol: move.symbol,
-        });
-      }
-    }
-
-    if (options.eventTitle) {
-      recordEvent({
-        title: options.eventTitle,
-        detail: options.eventDetail || `Match ${shortId(normalizedGame.matchId)}`,
-      });
-    }
-
-    boardRef.current = {
-      matchId: normalizedGame.matchId,
-      board: normalizedGame.board,
-    };
-    setGame(normalizedGame);
-  }, [recordEvent]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -320,168 +191,10 @@ export default function GamePage() {
   }, [loading, router, user]);
 
   useEffect(() => {
-    gameRef.current = game;
-  }, [game]);
-
-  useEffect(() => {
-    gameOverRef.current = gameOver;
-  }, [gameOver]);
-
-  useEffect(() => {
-    if (player?.game) {
-      commitGame(player.game, { source: "profile" });
+    if (liveStatus === "IDLE" && !gameOver) {
+      router.push("/dashboard");
     }
-  }, [commitGame, player?.game]);
-
-  useEffect(() => {
-    if (!lastMessage) return;
-
-    const signature = JSON.stringify(lastMessage);
-    if (lastProcessedMessageRef.current === signature) {
-      return;
-    }
-    lastProcessedMessageRef.current = signature;
-
-    const currentGame = gameRef.current;
-    const syncedGame = gameFromSync(lastMessage);
-    if (syncedGame) {
-      commitGame(syncedGame, {
-        source: "sync",
-        recordMove: boardRef.current.matchId === syncedGame.matchId,
-      });
-      setGameOver(null);
-      setNotice(null);
-      return;
-    }
-
-    if (lastMessage.type === "MATCH_CREATED") {
-      const matchGame: ActiveGameState = {
-        matchId: lastMessage.data.matchId,
-        players: currentGame?.players || [],
-        board: currentGame?.board || [...emptyBoard],
-        turn: currentGame?.turn || "",
-        mySymbol: currentGame?.mySymbol || "X",
-        status: "ACTIVE",
-        expiresAt: currentGame?.expiresAt || Date.now(),
-        opponentId: lastMessage.data.opponentId,
-      };
-
-      commitGame(matchGame, {
-        source: "match",
-        eventTitle: "Match allocated",
-        eventDetail: "Opponent found",
-      });
-      return;
-    }
-
-    if (lastMessage.type === "GAME_STARTED") {
-      commitGame({
-        matchId: lastMessage.data.matchId,
-        players: currentGame?.players || [lastMessage.data.recipientId, lastMessage.data.opponentId],
-        board: currentGame?.board || [...emptyBoard],
-        turn: lastMessage.data.turn,
-        mySymbol: lastMessage.data.mySymbol,
-        status: "ACTIVE",
-        expiresAt: lastMessage.data.expiresAt,
-        opponentId: lastMessage.data.opponentId,
-      }, {
-        source: "match",
-        eventTitle: "Game started",
-        eventDetail: `You are ${lastMessage.data.mySymbol}`,
-      });
-      setGameOver(null);
-      setNotice(null);
-      return;
-    }
-
-    if (lastMessage.type === "GAME_TURN") {
-      commitGame({
-        matchId: lastMessage.data.matchId,
-        players: currentGame?.players || [],
-        board: normalizeBoard(lastMessage.data.board),
-        turn: lastMessage.data.nextTurn,
-        mySymbol: currentGame?.mySymbol || "X",
-        status: "ACTIVE",
-        expiresAt: lastMessage.data.expiresAt,
-        opponentId: currentGame?.opponentId,
-      }, {
-        source: "turn",
-        recordMove: true,
-      });
-      setNotice(null);
-      return;
-    }
-
-    if (lastMessage.type === "INVALID_MOVE") {
-      setNotice(formatReason(lastMessage.data.reason) || "Invalid move.");
-      recordEvent({
-        title: "Move rejected",
-        detail: formatReason(lastMessage.data.reason) || "Invalid move",
-      });
-      return;
-    }
-
-    if (lastMessage.type === "CHAT_MESSAGE") {
-      if (lastMessage.data.matchId !== currentGame?.matchId) return;
-
-      recordChat({
-        from: lastMessage.data.from === user?.id ? "me" : "opponent",
-        text: lastMessage.data.text,
-        status: "sent",
-      });
-      return;
-    }
-
-    if (lastMessage.type === "chat.status") {
-      if (lastMessage.matchId !== currentGame?.matchId) return;
-
-      const failed = lastMessage.status === "FAILED";
-      const reason = formatReason(lastMessage.reason);
-      recordChat({
-        from: "system",
-        text: failed
-          ? `Message failed${reason ? `: ${reason}` : "."}`
-          : "Message delivered.",
-        status: failed ? "failed" : "sent",
-      });
-
-      if (failed) {
-        setNotice(reason ? `Chat failed: ${reason}.` : "Chat message failed.");
-      }
-      return;
-    }
-
-    if (lastMessage.type === "GAME_OVER") {
-      setGameOver(lastMessage.data);
-      if (currentGame) {
-        commitGame({
-          ...currentGame,
-          board: normalizeBoard(lastMessage.data.finalBoard),
-          status: "ENDED",
-        }, {
-          source: "over",
-          recordMove: true,
-          eventTitle: "Game over",
-          eventDetail: `${lastMessage.data.result.toLowerCase()} by ${formatReason(lastMessage.data.reason) || "completion"}`,
-        });
-      }
-      void refreshUser();
-      return;
-    }
-
-    if (
-      lastMessage.type === "ERROR" ||
-      lastMessage.type === "MATCH_ERROR" ||
-      lastMessage.type === "DISCONNECTED"
-    ) {
-      const data = lastMessage.data;
-      setNotice(
-        typeof data === "string"
-          ? data
-          : data?.reason || lastMessage.message || "Gateway error.",
-      );
-    }
-  }, [commitGame, lastMessage, recordChat, recordEvent, refreshUser, user?.id]);
+  }, [liveStatus, gameOver, router]);
 
   useEffect(() => {
     if (!game?.expiresAt || gameOver) {
@@ -561,63 +274,36 @@ export default function GamePage() {
   function makeMove(position: number) {
     if (!game || !isMyTurn || board[position] || gameOver) return;
 
-    const sent = send({
+    send({
       type: "GAME_MOVE",
       payload: {
         matchId: game.matchId,
         move: { position },
       },
     });
-
-    if (!sent) {
-      setNotice("Move was not sent because the socket is disconnected.");
-    }
   }
 
   function forfeit() {
     if (!game || gameOver) return;
 
-    const sent = send({
+    send({
       type: "GAME_FORFEIT",
       payload: {
         matchId: game.matchId,
       },
     });
-
-    if (!sent) {
-      setNotice("Forfeit was not sent because the socket is disconnected.");
-    }
   }
 
   function sendChat(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const text = chatText.trim();
-    if (!game || !text) return;
+    if (!text) return;
 
-    if (!chatRecipientId) {
-      setNotice("Chat is unavailable until an opponent is identified.");
-      return;
+    const sent = sendChatMessage(text);
+    if (sent) {
+      setChatText("");
     }
-
-    const sent = send({
-      type: "CHAT",
-      to: chatRecipientId,
-      matchId: game.matchId,
-      text,
-    });
-
-    if (!sent) {
-      setNotice("Chat was not sent because the socket is disconnected.");
-      return;
-    }
-
-    recordChat({
-      from: "me",
-      text,
-      status: "pending",
-    });
-    setChatText("");
   }
 
   if (loading || !user) {

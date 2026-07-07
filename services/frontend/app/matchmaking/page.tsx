@@ -16,43 +16,37 @@ import {
 import { matchmakingApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameSocket } from "@/hooks/useGameSocket";
-import type { CurrentPlayerState, GameSocketMessage, PlayerStatus } from "@/lib/types";
-
-function getSyncState(message: GameSocketMessage | null) {
-  if (
-    message?.type === "CONNECT_SYNC" ||
-    message?.type === "SYNC_RESPONSE"
-  ) {
-    return message.data;
-  }
-
-  return null;
-}
+import type { CurrentPlayerState } from "@/lib/types";
 
 export default function MatchmakingPage() {
   const router = useRouter();
   const { loading, player, refreshUser, user } = useAuth();
-  const { connectionState, isConnected, lastMessage, sync } = useGameSocket(
-    !!user,
-  );
+  const {
+    connectionState,
+    isConnected,
+    sync,
+    liveStatus,
+    liveQueue,
+    liveGame,
+    notice,
+    clearNotice,
+  } = useGameSocket(!!user);
   const requestedJoinRef = useRef(false);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queueStartedAt, setQueueStartedAt] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const syncState = getSyncState(lastMessage);
 
   const livePlayer = useMemo<Partial<CurrentPlayerState> | null>(() => {
     if (!player) return null;
 
     return {
       ...player,
-      ...syncState,
-      game: syncState?.game || player.game,
-      queue: syncState?.queue || player.queue,
-      status: (syncState?.status as PlayerStatus | undefined) || player.status,
+      game: liveGame || player.game,
+      queue: liveQueue || player.queue,
+      status: liveStatus !== "OFFLINE" ? liveStatus : player.status,
     };
-  }, [player, syncState]);
+  }, [player, liveGame, liveQueue, liveStatus]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -71,6 +65,14 @@ export default function MatchmakingPage() {
   }, [queueStartedAt]);
 
   useEffect(() => {
+    if (liveStatus === "IN_GAME" || livePlayer?.game) {
+      router.push("/game");
+    } else if (liveStatus === "IDLE" && requestedJoinRef.current && !joining) {
+      router.push("/dashboard");
+    }
+  }, [liveStatus, livePlayer?.game, router, joining]);
+
+  useEffect(() => {
     if (!isConnected || !user || requestedJoinRef.current) return;
 
     if (livePlayer?.status === "IN_GAME" || livePlayer?.game) {
@@ -81,6 +83,7 @@ export default function MatchmakingPage() {
     requestedJoinRef.current = true;
     setJoining(true);
     setError(null);
+    clearNotice();
 
     matchmakingApi
       .join()
@@ -97,37 +100,7 @@ export default function MatchmakingPage() {
         setError(message);
       })
       .finally(() => setJoining(false));
-  }, [isConnected, livePlayer?.game, livePlayer?.status, refreshUser, router, user]);
-
-  useEffect(() => {
-    if (!lastMessage) return;
-
-    if (
-      lastMessage.type === "MATCH_CREATED" ||
-      lastMessage.type === "GAME_STARTED" ||
-      (getSyncState(lastMessage)?.status === "IN_GAME")
-    ) {
-      router.push("/game");
-    }
-
-    if (lastMessage.type === "QUEUE_JOINED") {
-      setQueueStartedAt(Date.now());
-      setError(null);
-    }
-
-    if (lastMessage.type === "QUEUE_LEFT") {
-      router.push("/dashboard");
-    }
-
-    if (lastMessage.type === "MATCH_ERROR" || lastMessage.type === "ERROR") {
-      const data = lastMessage.data;
-      setError(
-        typeof data === "string"
-          ? data
-          : data?.reason || lastMessage.message || "Matchmaking error.",
-      );
-    }
-  }, [lastMessage, router]);
+  }, [isConnected, livePlayer?.game, livePlayer?.status, refreshUser, router, user, clearNotice]);
 
   async function leaveQueue() {
     setError(null);
@@ -192,9 +165,9 @@ export default function MatchmakingPage() {
                 : "Connecting to the websocket gateway..."}
           </div>
 
-          {error && (
+          {(error || notice) && (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {error}
+              {error || notice}
             </div>
           )}
         </CardContent>
