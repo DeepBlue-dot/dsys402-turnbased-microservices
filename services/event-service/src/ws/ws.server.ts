@@ -83,6 +83,21 @@ export const startWSServer = (server: http.Server) => {
               success=true;
               break;
 
+            case "GAME_DRAW_PROPOSE":
+              await gatewayService.handleGameDrawPropose(userId, payload.matchId);
+              success=true;
+              break;
+
+            case "GAME_DRAW_CONFIRM":
+              await gatewayService.handleGameDrawConfirm(userId, payload.matchId);
+              success=true;
+              break;
+
+            case "GAME_DRAW_DECLINE":
+              await gatewayService.handleGameDrawDecline(userId, payload.matchId);
+              success=true;
+              break;
+
             case "SYNC_REQUEST":
               const currentState =
                 await gatewayService.handleSyncRequest(userId);

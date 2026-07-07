@@ -17,6 +17,18 @@ export const handleEvents = async (event: Event) => {
       await gameService.handleForfeit(data.matchId, data.userId);
       break;
 
+    case "game.cmd.draw_propose":
+      await gameService.handleDrawPropose(data.matchId, data.userId);
+      break;
+
+    case "game.cmd.draw_confirm":
+      await gameService.handleDrawConfirm(data.matchId, data.userId);
+      break;
+
+    case "game.cmd.draw_decline":
+      await gameService.handleDrawDecline(data.matchId, data.userId);
+      break;
+
     case "player.disconnected":
       await gameService.handlePlayerDisconnect(data.userId);
       break;

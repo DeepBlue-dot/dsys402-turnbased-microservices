@@ -40,6 +40,18 @@ export const gatewayService = {
     await publishEvent("game.cmd.forfeit", { userId, matchId });
   },
 
+  async handleGameDrawPropose(userId: string, matchId: string) {
+    await publishEvent("game.cmd.draw_propose", { userId, matchId });
+  },
+
+  async handleGameDrawConfirm(userId: string, matchId: string) {
+    await publishEvent("game.cmd.draw_confirm", { userId, matchId });
+  },
+
+  async handleGameDrawDecline(userId: string, matchId: string) {
+    await publishEvent("game.cmd.draw_decline", { userId, matchId });
+  },
+
   async handleSyncRequest(userId: string) {
     const presenceKey = `presence:${userId}`;
 
@@ -95,6 +107,7 @@ export const gatewayService = {
           status: gameData.status,
           version: Number(gameData.version || 0),
           expiresAt: Number(gameData.expiresAt),
+          drawProposedBy: gameData.drawProposedBy || null,
         };
       } else {
         // 🔥 Self-heal: dangling index

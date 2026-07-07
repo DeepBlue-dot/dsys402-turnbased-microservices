@@ -152,13 +152,17 @@ export const gameService = {
     const nextTurn = players.find((id) => id !== userId)!;
     const expiresAt = Date.now() + config.turnTimeoutSec * 1000;
 
-    await redis.hset(key, {
-      board: JSON.stringify(board),
-      turn: nextTurn,
-      expiresAt: expiresAt.toString(),
-      moves: JSON.stringify(moves),
-      turnCount: (Number(state.turnCount) + 1).toString(),
-    });
+    await redis
+      .pipeline()
+      .hset(key, {
+        board: JSON.stringify(board),
+        turn: nextTurn,
+        expiresAt: expiresAt.toString(),
+        moves: JSON.stringify(moves),
+        turnCount: (Number(state.turnCount) + 1).toString(),
+      })
+      .hdel(key, "drawProposedBy")
+      .exec();
 
     await this.setTurnTimer(matchId);
 
@@ -175,6 +179,7 @@ export const gameService = {
           nextTurn,
           isMyTurn: nextTurn === loc.userId,
           expiresAt,
+          drawProposedBy: null,
         });
       }
     }
@@ -272,6 +277,91 @@ export const gameService = {
     const winnerId = players.find((id) => id !== userId) || null;
     await this.clearTurnTimer(matchId);
     await this.endGame(matchId, JSON.parse(state.board), winnerId, "FORFEIT");
+  },
+
+  async handleDrawPropose(matchId: string, userId: string) {
+    const key = `game:match:${matchId}`;
+    const state = await redis.hgetall(key);
+    if (!state || Object.keys(state).length === 0 || state.status !== "ACTIVE") {
+      return;
+    }
+
+    const players: string[] = JSON.parse(state.players);
+    if (!players.includes(userId)) return;
+
+    const existingDrawProposer = state.drawProposedBy;
+
+    if (existingDrawProposer) {
+      if (existingDrawProposer !== userId) {
+        // Confirm draw since opponent already proposed it
+        await this.clearTurnTimer(matchId);
+        await this.endGame(matchId, JSON.parse(state.board), null, "DRAW");
+      }
+      return;
+    }
+
+    // Otherwise, propose draw
+    await redis.hset(key, { drawProposedBy: userId });
+
+    const locations = await Promise.all(
+      players.map((id) => this.getPlayerLocation(id)),
+    );
+
+    for (const loc of locations) {
+      if (loc) {
+        await publishEvent(`game.event.draw_proposed.${loc.instanceId}`, {
+          recipientId: loc.userId,
+          matchId,
+          proposedBy: userId,
+        });
+      }
+    }
+  },
+
+  async handleDrawConfirm(matchId: string, userId: string) {
+    const key = `game:match:${matchId}`;
+    const state = await redis.hgetall(key);
+    if (!state || Object.keys(state).length === 0 || state.status !== "ACTIVE") {
+      return;
+    }
+
+    const players: string[] = JSON.parse(state.players);
+    if (!players.includes(userId)) return;
+
+    const existingDrawProposer = state.drawProposedBy;
+    if (existingDrawProposer && existingDrawProposer !== userId) {
+      await this.clearTurnTimer(matchId);
+      await this.endGame(matchId, JSON.parse(state.board), null, "DRAW");
+    }
+  },
+
+  async handleDrawDecline(matchId: string, userId: string) {
+    const key = `game:match:${matchId}`;
+    const state = await redis.hgetall(key);
+    if (!state || Object.keys(state).length === 0 || state.status !== "ACTIVE") {
+      return;
+    }
+
+    const players: string[] = JSON.parse(state.players);
+    if (!players.includes(userId)) return;
+
+    // Only decline if there is an active draw proposal
+    if (!state.drawProposedBy) return;
+
+    await redis.hdel(key, "drawProposedBy");
+
+    const locations = await Promise.all(
+      players.map((id) => this.getPlayerLocation(id)),
+    );
+
+    for (const loc of locations) {
+      if (loc) {
+        await publishEvent(`game.event.draw_declined.${loc.instanceId}`, {
+          recipientId: loc.userId,
+          matchId,
+        });
+      }
+    }
   },
 
   /* ───────────────────────── UTIL ───────────────────────── */

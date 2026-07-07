@@ -29,6 +29,14 @@ export const handleEvents = async (event: {
       await handleGameTurn(event.data);
       break;
 
+    case "game.event.draw_proposed":
+      await handleDrawProposed(event.data);
+      break;
+
+    case "game.event.draw_declined":
+      await handleDrawDeclined(event.data);
+      break;
+
     case "game.event.invalid":
       await handleInvalidMove(event.data);
       break;
@@ -125,9 +133,30 @@ const handleMatchFailed = async (payload: {
   reason: string;
 }) => {
   // If the game failed to start, tell the specific player
+    sendToUser(payload.recipientId, {
+      type: "MATCH_ERROR",
+      data: { reason: payload.reason },
+    });
+  };
+
+const handleDrawProposed = async (payload: {
+  recipientId: string;
+  matchId: string;
+  proposedBy: string;
+}) => {
   sendToUser(payload.recipientId, {
-    type: "MATCH_ERROR",
-    data: { reason: payload.reason },
+    type: "GAME_DRAW_PROPOSED",
+    data: payload,
+  });
+};
+
+const handleDrawDeclined = async (payload: {
+  recipientId: string;
+  matchId: string;
+}) => {
+  sendToUser(payload.recipientId, {
+    type: "GAME_DRAW_DECLINED",
+    data: payload,
   });
 };
 

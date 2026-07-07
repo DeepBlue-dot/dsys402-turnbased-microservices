@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { historyApi, matchmakingApi } from "@/lib/api";
+import { historyApi, matchmakingApi, playerApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameSocket } from "@/hooks/useGameSocket";
@@ -69,6 +69,42 @@ export default function DashboardPage() {
       status: liveStatus !== "OFFLINE" ? liveStatus : player.status,
     };
   }, [player, liveGame, liveQueue, liveStatus]);
+
+  const [usernames, setUsernames] = useState<Record<string, string>>({});
+  const [liveOpponentUsername, setLiveOpponentUsername] = useState<string>("Loading...");
+
+  const liveOpponentId = useMemo(() => {
+    if (!livePlayer?.game?.players || !user?.id) return null;
+    return livePlayer.game.players.find((id) => id !== user.id) || null;
+  }, [livePlayer, user]);
+
+  useEffect(() => {
+    if (!liveOpponentId) return;
+    playerApi
+      .publicProfile(liveOpponentId)
+      .then((profile) => setLiveOpponentUsername(profile.username))
+      .catch(() => setLiveOpponentUsername("unknown"));
+  }, [liveOpponentId]);
+
+  useEffect(() => {
+    const opponentIds = Array.from(
+      new Set(history.map((m) => m.opponentId).filter((id): id is string => !!id))
+    );
+    opponentIds.forEach((id) => {
+      setUsernames((prev) => {
+        if (prev[id]) return prev;
+        playerApi
+          .publicProfile(id)
+          .then((profile) => {
+            setUsernames((p) => ({ ...p, [id]: profile.username }));
+          })
+          .catch((err) => {
+            console.error(`Failed to fetch profile for player ${id}:`, err);
+          });
+        return prev;
+      });
+    });
+  }, [history]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -246,10 +282,12 @@ export default function DashboardPage() {
             {livePlayer.game && livePlayer.game.status === "ACTIVE" && (
               <>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Match</span>
-                  <span className="truncate font-mono text-xs">
-                    {livePlayer.game.matchId}
-                  </span>
+                  <span className="text-muted-foreground">Match Type</span>
+                  <span className="font-semibold text-xs">Classic Match</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Opponent</span>
+                  <span className="font-semibold text-xs">{liveOpponentUsername}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Symbol</span>
@@ -277,11 +315,19 @@ export default function DashboardPage() {
                     className="flex items-center justify-between gap-4 rounded-md border border-border bg-card/60 p-3"
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-mono text-xs text-muted-foreground">
-                        {match.matchId}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          Classic Match
+                        </span>
+                        <span className="text-[10px] text-muted-foreground/60">
+                          {new Date(match.endedAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </div>
                       <p className="text-sm">
-                        vs {match.opponentId || "unknown"} · {match.turnCount} turns
+                        vs {match.opponentId ? (usernames[match.opponentId] || "Loading...") : "unknown"} · {match.turnCount} turns
                       </p>
                     </div>
                     <span

@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Clock3,
   Flag,
+  Handshake,
   History,
   Loader2,
   MessageSquare,
@@ -294,6 +295,39 @@ export default function GamePage() {
     });
   }
 
+  function proposeDraw() {
+    if (!game || gameOver) return;
+
+    send({
+      type: "GAME_DRAW_PROPOSE",
+      payload: {
+        matchId: game.matchId,
+      },
+    });
+  }
+
+  function confirmDraw() {
+    if (!game || gameOver) return;
+
+    send({
+      type: "GAME_DRAW_CONFIRM",
+      payload: {
+        matchId: game.matchId,
+      },
+    });
+  }
+
+  function declineDraw() {
+    if (!game || gameOver) return;
+
+    send({
+      type: "GAME_DRAW_DECLINE",
+      payload: {
+        matchId: game.matchId,
+      },
+    });
+  }
+
   function sendChat(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -385,8 +419,52 @@ export default function GamePage() {
               <Flag className="h-4 w-4" aria-hidden="true" />
               Forfeit
             </Button>
+            <Button
+              variant="outline"
+              onClick={proposeDraw}
+              disabled={!!gameOver || !isConnected || !!game.drawProposedBy}
+            >
+              <Handshake className="h-4 w-4" aria-hidden="true" />
+              Propose Draw
+            </Button>
           </div>
         </div>
+
+        {game.drawProposedBy && (
+          <div className="flex flex-col gap-4 rounded-md border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between animate-pulse">
+            <div className="flex items-center gap-2">
+              <Handshake className="h-5 w-5 text-amber-500" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {game.drawProposedBy === user.id
+                    ? "Draw offer pending"
+                    : "Draw offered by opponent"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {game.drawProposedBy === user.id
+                    ? "Waiting for opponent response..."
+                    : "Would you like to accept the draw?"}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {game.drawProposedBy !== user.id ? (
+                <>
+                  <Button size="sm" onClick={confirmDraw} className="bg-amber-600 hover:bg-amber-700 text-white">
+                    Accept
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={declineDraw}>
+                    Decline
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" variant="outline" onClick={declineDraw}>
+                  Cancel Offer
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-3">
           <PlayerPanel
@@ -580,7 +658,7 @@ export default function GamePage() {
                 ) : gameOver.result === "LOSS" ? (
                   <span className="text-3xl font-black text-accent">{opponentSymbol}</span>
                 ) : (
-                  <Loader2 className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+                  <Handshake className="h-8 w-8 text-amber-500 animate-bounce" aria-hidden="true" />
                 )}
               </div>
               <div>

@@ -280,13 +280,14 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
               }
             }
           }
-          setLiveGame((prev) => {
+           setLiveGame((prev) => {
             if (!prev) return null;
             return {
               ...prev,
               board: nextBoard,
               turn: message.data.nextTurn,
               expiresAt: message.data.expiresAt,
+              drawProposedBy: message.data.drawProposedBy || null,
             };
           });
           if (moveSymbol !== undefined && movePos !== undefined) {
@@ -300,9 +301,40 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
           }
           break;
         }
-        case "INVALID_MOVE": {
+         case "INVALID_MOVE": {
           setNotice(message.data.reason);
           addFeedItem("Move rejected", message.data.reason);
+          break;
+        }
+        case "GAME_DRAW_PROPOSED": {
+          setLiveGame((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              drawProposedBy: message.data.proposedBy,
+            };
+          });
+          const isFromMe = message.data.proposedBy === userId;
+          addFeedItem(
+            isFromMe ? "Draw proposed" : "Draw offered",
+            isFromMe ? "You proposed a draw" : "Opponent proposed a draw",
+          );
+          break;
+        }
+        case "GAME_DRAW_DECLINED": {
+          const currentGame = liveGameRef.current;
+          const wasProposedByMe = currentGame?.drawProposedBy === userId;
+          setLiveGame((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              drawProposedBy: null,
+            };
+          });
+          addFeedItem(
+            "Draw offer declined",
+            wasProposedByMe ? "Opponent declined the draw" : "You declined the draw",
+          );
           break;
         }
         case "GAME_OVER": {

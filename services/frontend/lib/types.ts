@@ -61,6 +61,7 @@ export type ActiveGameState = {
   version?: number;
   expiresAt: number;
   opponentId?: string;
+  drawProposedBy?: string | null;
 };
 
 export type CurrentPlayerState = {
@@ -215,6 +216,7 @@ export type GameTurnMessage = {
     nextTurn: string;
     isMyTurn: boolean;
     expiresAt: number;
+    drawProposedBy?: string | null;
   };
   timestamp?: string;
 };
@@ -278,6 +280,25 @@ export type ErrorMessage = {
   timestamp?: string;
 };
 
+export type GameDrawProposedMessage = {
+  type: "GAME_DRAW_PROPOSED";
+  data: {
+    recipientId: string;
+    matchId: string;
+    proposedBy: string;
+  };
+  timestamp?: string;
+};
+
+export type GameDrawDeclinedMessage = {
+  type: "GAME_DRAW_DECLINED";
+  data: {
+    recipientId: string;
+    matchId: string;
+  };
+  timestamp?: string;
+};
+
 export type GameSocketMessage =
   | ConnectSyncMessage
   | QueueJoinedMessage
@@ -290,7 +311,9 @@ export type GameSocketMessage =
   | ChatMessage
   | ChatStatusMessage
   | AckMessage
-  | ErrorMessage;
+  | ErrorMessage
+  | GameDrawProposedMessage
+  | GameDrawDeclinedMessage;
 
 export type OutgoingSocketMessage =
   | {
@@ -308,6 +331,24 @@ export type OutgoingSocketMessage =
     }
   | {
       type: "GAME_FORFEIT";
+      payload: {
+        matchId: string;
+      };
+    }
+  | {
+      type: "GAME_DRAW_PROPOSE";
+      payload: {
+        matchId: string;
+      };
+    }
+  | {
+      type: "GAME_DRAW_CONFIRM";
+      payload: {
+        matchId: string;
+      };
+    }
+  | {
+      type: "GAME_DRAW_DECLINE";
       payload: {
         matchId: string;
       };

@@ -45,6 +45,9 @@ export const config = {
     "game.cmd.move",        // Player requesting a move
     "game.cmd.forfeit",     // Player surrendering
     "player.disconnected",  // To start reconnection grace timer
+    "game.cmd.draw_propose",
+    "game.cmd.draw_confirm",
+    "game.cmd.draw_decline",
   ],
 
   // 🛡️ Security
