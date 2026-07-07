@@ -226,3 +226,28 @@ Key source folders:
 - `src/routes/MatchHistory.routes.ts` — authenticated history routes
 - `src/controllers/history.controller.ts` — history query handling
 - `src/models/MatchHistory.model.ts` — MongoDB persistence schema
+
+---
+
+## Invariants (Hard Rules)
+
+* **Single Turn Ownership**: Move commands (`game.cmd.move`) can only update the game board if the submitting player's ID matches the active `turn` field stored in the Redis match hash.
+* **Ephemeral Active State**: Active match states and turn timers must live entirely in Redis. MongoDB holds only archived, read-only completed match histories.
+* **Atomic Turn Expiry**: Timeout forfeits processed by the watchdog worker must atomically clean up both the active `game:match:<matchId>` hash and the `player:match_map:<userId>` indices to prevent dangling in-game states.
+
+---
+
+## Operational Recommendations
+
+* **Watchdog Loop Tuning**: The background watchdog scans the `game:timers` sorted set periodically (`WATCHDOG_INTERVAL_MS`). Set this interval appropriately; too high increases timeout resolution delay, while too low causes excessive Redis poll overhead.
+* **Cron/Task Monitoring**: Keep track of the database migration status for MongoDB schemas when upgrading active match properties.
+
+---
+
+## Philosophy
+
+> The Game Logic Service is the rule authority of the system.
+> It defines the boundary between legal play and cheating.
+
+By strictly decoupling game rules from client-facing websocket gateways and player presence, this service maintains absolute integrity over turn processing, scoring, and history preservation.
+

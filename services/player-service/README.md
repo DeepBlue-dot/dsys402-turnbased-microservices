@@ -328,10 +328,10 @@ Because every other service depends on it.
 This section explains the runtime behavior, important Redis keys, event contracts, background workers, and configuration knobs so engineers can debug and operate the service.
 
 - Primary implementation files:
-   - `src/consumers/Events.consumer.ts` — event handlers for `player.connected`, `player.disconnected`, `player.heartbeat`, and `match.ended` (also contains Elo update logic).
-   - `src/worker/janitor.worker.ts` — presence janitor that increments `missedHeartbeats` and emits `player.disconnected` when unresponsive.
-   - `src/controllers/player.controller.ts` — HTTP controller for `GET /me` and responses that surface live presence and in-game state.
-   - `src/config/env.ts` — required environment variables and routing keys.
+   - [Events.consumer.ts](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/player-service/src/consumers/Events.consumer.ts) — event handlers for `player.connected`, `player.disconnected`, `player.heartbeat`, and `match.ended` (also contains Elo update logic).
+   - [janitor.worker.ts](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/player-service/src/worker/janitor.worker.ts) — presence janitor that increments `missedHeartbeats` and emits `player.disconnected` when unresponsive.
+   - [player.controller.ts](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/player-service/src/controllers/player.controller.ts) — HTTP controller for `GET /me` and responses that surface live presence and in-game state.
+   - [env.ts](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/player-service/src/config/env.ts) — required environment variables and routing keys.
 
 ### Key Redis Keys
 

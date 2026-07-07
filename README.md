@@ -44,7 +44,7 @@ MongoDB (Persistent State)
 
 ## Services
 
-### 1. WebSocket Gateway
+### 1. [WebSocket Gateway (event-service)](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/event-service) | [Detailed README](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/event-service/README.md)
 
 Responsible for:
 
@@ -58,7 +58,7 @@ It does **not** own business logic or domain state.
 
 ---
 
-### 2. Player Service
+### 2. [Player Service (player-service)](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/player-service) | [Detailed README](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/player-service/README.md)
 
 Owns:
 
@@ -71,7 +71,7 @@ Acts as the **single authority** for player state.
 
 ---
 
-### 3. Matchmaking Service
+### 3. [Matchmaking Service (matchmaking-service)](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/matchmaking-service) | [Detailed README](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/matchmaking-service/README.md)
 
 Responsible for:
 
@@ -87,17 +87,29 @@ Produces:
 
 ---
 
-### 4. Game Service
+### 4. [Game Service (game-logic-service)](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/game-logic-service) | [Detailed README](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/game-logic-service/README.md)
 
 Owns:
 
-* Game rules
+* Game rules (Tic-Tac-Toe turn validations)
 * Turn validation
 * Win / lose / draw logic
 * Timers
 * State transitions
 
 Uses Redis for atomic game state and MongoDB for history.
+
+---
+
+### 5. [Frontend App (frontend)](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/frontend) | [Detailed README](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/services/frontend/README.md)
+
+Provides:
+
+* User Registration / Sign-In pages
+* Real-time matchmaking queue wait state panels
+* Interactive game board grid with synchronized turn timers
+* Active match emoji and text chat interface
+* Historical match review explorer and profile settings dashboard
 
 ---
 
@@ -236,6 +248,8 @@ Supports:
 * Node.js / Go / Python (depending on implementation)
 
 ### Start Everything
+
+Start the service infrastructure and backend microservices using the root [docker-compose.yml](file:///home/bigblue/Projects/web/dsys402-turnbased-microservices/docker-compose.yml) definition:
 
 ```bash
 docker-compose up
