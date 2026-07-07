@@ -11,6 +11,7 @@ import {
   updateMyEmail,
   updateMyPassword,
   updateMyProfile,
+  uploadAvatar,
 } from "../controllers/player.controller.js";
 
 import {
@@ -19,10 +20,31 @@ import {
   updatePasswordSchema,
 } from "../validators/player.validator.js";
 
+import multer from "multer";
+
 const router = Router();
+
+const upload = multer({
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      return cb(new Error("Only image files are allowed!"));
+    }
+    cb(null, true);
+  },
+});
 
 // ---- Authenticated user routes ----
 router.get("/me", authMiddleware, getMyData);
+
+router.post(
+  "/me/avatar",
+  authMiddleware,
+  upload.single("avatar"),
+  uploadAvatar
+);
 
 router.put(
   "/me/profile",

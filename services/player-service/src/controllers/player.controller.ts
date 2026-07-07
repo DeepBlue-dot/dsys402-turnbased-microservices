@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { AuthRequest } from "../types/types.js";
 import * as schema from "../validators/player.validator.js";
 import { redis } from "../config/redis.js";
+import { minioClient } from "../config/minio.js";
+import { config } from "../config/env.js";
 
 const QUEUE_KEY = "match:queue:ranked";
 const JOIN_TIMES_KEY = "match:join_times";
@@ -279,4 +281,58 @@ export const searchPlayers = catchAsync(
       },
     });
   },
+);
+
+// POST /me/avatar
+export const uploadAvatar = catchAsync(
+  async (req: AuthRequest, res: Response) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // 1. Fetch current profile to clean up old avatar
+    const currentProfile = await prisma.playerProfile.findUnique({
+      where: { playerId: userId },
+      select: { avatarUrl: true },
+    });
+
+    const bucketName = config.minio.avatarsBucket;
+
+    if (currentProfile?.avatarUrl && currentProfile.avatarUrl.startsWith("/avatars/")) {
+      const oldObjectName = currentProfile.avatarUrl.replace("/avatars/", "");
+      try {
+        await minioClient.removeObject(bucketName, oldObjectName);
+        console.log(`[MinIO] Old avatar "${oldObjectName}" removed.`);
+      } catch (err) {
+        console.error(`[MinIO] Failed to remove old avatar "${oldObjectName}":`, err);
+      }
+    }
+
+    // 2. Upload new avatar
+    const fileExt = req.file.originalname.split(".").pop();
+    const objectName = `${userId}-${Date.now()}.${fileExt}`;
+
+    await minioClient.putObject(
+      bucketName,
+      objectName,
+      req.file.buffer,
+      req.file.size,
+      { "Content-Type": req.file.mimetype }
+    );
+
+    const avatarUrl = `/avatars/${objectName}`;
+
+    // 3. Save to database
+    const updated = await prisma.playerProfile.update({
+      where: { playerId: userId },
+      data: { avatarUrl },
+    });
+
+    res.json(updated);
+  }
 );

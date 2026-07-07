@@ -42,6 +42,50 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image file must be under 5MB.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const data = await playerApi.uploadAvatar(file);
+      setProfile((prev) => ({ ...prev, avatarUrl: data.avatarUrl }));
+      await refreshUser();
+      setMessage("Avatar uploaded successfully.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload avatar.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await playerApi.updateProfile({
+        avatarUrl: "",
+      });
+      setProfile((prev) => ({ ...prev, avatarUrl: "" }));
+      await refreshUser();
+      setMessage("Avatar removed successfully.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove avatar.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
@@ -210,21 +254,75 @@ export default function SettingsPage() {
                       <p className="text-xs text-muted-foreground">3 to 20 characters. Letters, numbers and underscores only.</p>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="avatarUrl" className="flex items-center gap-2">
+                    <div className="space-y-3">
+                      <Label className="flex items-center gap-2">
                         <Camera className="h-4 w-4 text-muted-foreground" />
-                        Avatar URL
+                        Avatar Image
                       </Label>
-                      <Input
-                        id="avatarUrl"
-                        value={profile.avatarUrl}
-                        onChange={(event) =>
-                          setProfile({ ...profile, avatarUrl: event.target.value })
-                        }
-                        placeholder="https://images.unsplash.com/photo-..."
-                        className="bg-muted/30 focus-visible:ring-primary/50"
-                      />
-                      <p className="text-xs text-muted-foreground">URL hosting your profile picture. Leave blank to generate letter placeholder.</p>
+                      
+                      <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-xl border border-dashed border-border/80 bg-muted/10">
+                        {/* Current avatar preview */}
+                        <div className="relative group shrink-0">
+                          {profile.avatarUrl ? (
+                            <img
+                              src={profile.avatarUrl}
+                              alt="Avatar Preview"
+                              className="h-16 w-16 rounded-full object-cover border border-border shadow-sm animate-in fade-in duration-200"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                                const sibling = (e.target as HTMLElement).nextElementSibling;
+                                if (sibling) sibling.classList.remove("hidden");
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={`h-16 w-16 rounded-full bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-xl font-black text-white shadow-sm uppercase select-none ${
+                              profile.avatarUrl ? "hidden" : ""
+                            }`}
+                          >
+                            {profile.username ? profile.username[0] : "?"}
+                          </div>
+                        </div>
+
+                        {/* File Selector */}
+                        <div className="flex-1 text-center sm:text-left space-y-1.5">
+                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                            <input
+                              type="file"
+                              id="avatarFile"
+                              accept="image/*"
+                              onChange={handleAvatarChange}
+                              className="hidden"
+                              disabled={saving}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={saving}
+                              onClick={() => document.getElementById("avatarFile")?.click()}
+                              className="min-h-9 rounded-lg border-border/80 hover:bg-muted/50 transition-colors"
+                            >
+                              Choose New Image
+                            </Button>
+                            {profile.avatarUrl && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={saving}
+                                onClick={handleRemoveAvatar}
+                                className="min-h-9 text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              >
+                                Remove
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Supports PNG, JPG, JPEG or WEBP (Max 5MB).
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="space-y-2">

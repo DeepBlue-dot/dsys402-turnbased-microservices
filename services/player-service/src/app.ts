@@ -6,6 +6,7 @@ import { handleEvents } from "./consumers/Events.consumer.js";
 import { config } from "./config/env.js";
 import { startPresenceJanitor } from "./worker/janitor.worker.js";
 import {errorHandler} from "./middleware/error.middleware.js";
+import { initializeMinio } from "./config/minio.js";
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use(errorHandler);
 const startApp = async () => {
   await initRabbit();
   await consumeEvents(config.playerEventsQueue, handleEvents);
+  await initializeMinio();
 
   startPresenceJanitor()
 

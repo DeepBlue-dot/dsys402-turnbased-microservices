@@ -35,4 +35,14 @@ export const config = {
   jwtExpiry: (process.env.JWT_EXPIRES_IN ?? "1d") as SignOptions["expiresIn"],
 
   bcryptRounds: 10,
+
+  // MinIO
+  minio: {
+    endpoint: process.env.MINIO_ENDPOINT || "minio",
+    port: Number(process.env.MINIO_PORT) || 9000,
+    useSSL: process.env.MINIO_USE_SSL === "true",
+    accessKey: process.env.MINIO_ROOT_USER || "minioadmin",
+    secretKey: process.env.MINIO_ROOT_PASSWORD || "minioadminpassword",
+    avatarsBucket: process.env.MINIO_AVATARS_BUCKET || "avatars",
+  },
 };

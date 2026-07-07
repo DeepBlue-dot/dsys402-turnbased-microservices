@@ -127,6 +127,17 @@ export const playerApi = {
     return res.data;
   },
 
+  async uploadAvatar(file: File) {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    const res = await api.post<{ avatarUrl: string }>("/player/me/avatar", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return res.data;
+  },
+
   async updateEmail(payload: { email: string }) {
     const res = await api.put<{ message: string }>("/player/me/email", payload);
     return res.data;

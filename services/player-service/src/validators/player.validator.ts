@@ -14,7 +14,7 @@ export const validate =
   
 export const updateProfileSchema = z.object({
   username: z.string().min(3).max(20).optional(),
-  avatarUrl: z.url().optional().or(z.literal("")),
+  avatarUrl: z.string().max(2048).optional().or(z.literal("")),
   bio: z.string().max(200).optional(),
 });
 
