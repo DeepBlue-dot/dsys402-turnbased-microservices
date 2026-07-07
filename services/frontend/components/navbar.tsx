@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, Swords, UserPlus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getAvatarUrl } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -48,9 +48,33 @@ export function Navbar() {
                 <div className="flex flex-1 items-center justify-end gap-2">
                     {isAuthenticated ? (
                         <>
-                            <span className="hidden max-w-36 truncate text-sm text-muted-foreground sm:block">
-                                {user?.username}
-                            </span>
+                            <div className="hidden sm:flex items-center gap-2">
+                                <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-[10px] select-none shadow-sm uppercase overflow-hidden">
+                                    {getAvatarUrl(user?.avatarUrl) ? (
+                                        <img
+                                            src={getAvatarUrl(user?.avatarUrl) || undefined}
+                                            alt={`${user?.username}'s avatar`}
+                                            className="h-full w-full object-cover animate-in fade-in duration-200"
+                                            onError={(e) => {
+                                                (e.target as HTMLElement).style.display = "none";
+                                                const sibling = (e.target as HTMLElement).nextElementSibling;
+                                                if (sibling) sibling.classList.remove("hidden");
+                                            }}
+                                        />
+                                    ) : null}
+                                    <div
+                                        className={cn(
+                                            "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black w-full h-full text-[10px]",
+                                            getAvatarUrl(user?.avatarUrl) ? "hidden" : ""
+                                        )}
+                                    >
+                                        {user?.username ? user.username.charAt(0).toUpperCase() : "?"}
+                                    </div>
+                                </div>
+                                <span className="max-w-36 truncate text-sm text-muted-foreground">
+                                    {user?.username}
+                                </span>
+                            </div>
                             <Button variant="ghost" size="sm" onClick={() => void logout()} title="Log out">
                                 <LogOut className="h-4 w-4" aria-hidden="true" />
                                 <span className="sr-only">Log out</span>

@@ -19,6 +19,7 @@ type AuthUser = {
   username: string;
   rating: number;
   status: CurrentPlayerState["status"];
+  avatarUrl: string | null;
 };
 
 type AuthContextValue = {
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: player.profile?.username || player.email,
       rating: player.rating,
       status: player.status,
+      avatarUrl: player.profile?.avatarUrl || null,
     };
   }, [player]);
 

@@ -9,8 +9,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { historyApi, playerApi } from "@/lib/api";
-import { cn } from "@/lib/utils";
-import type { BoardCell, MatchDetail } from "@/lib/types";
+import { cn, getAvatarUrl } from "@/lib/utils";
+import type { BoardCell, MatchDetail, PublicPlayerInfo } from "@/lib/types";
+import { useAuth } from "@/hooks/useAuth";
 
 function getWinningLine(board: BoardCell[]) {
   const lines = [
@@ -29,26 +30,27 @@ function getWinningLine(board: BoardCell[]) {
 
 export default function MatchDetailPage() {
   const router = useRouter();
+  const { player } = useAuth();
   const params = useParams<{ matchId: string }>();
   const [match, setMatch] = useState<MatchDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [opponentUsername, setOpponentUsername] = useState<string>("Loading...");
+  const [opponentProfile, setOpponentProfile] = useState<PublicPlayerInfo | null>(null);
 
   useEffect(() => {
     if (!match) return;
     if (!match.players.opponent) {
-      setOpponentUsername("unknown");
+      setOpponentProfile(null);
       return;
     }
 
     playerApi
       .publicProfile(match.players.opponent)
       .then((profile) => {
-        setOpponentUsername(profile.username);
+        setOpponentProfile(profile);
       })
       .catch((err) => {
         console.error("Failed to fetch opponent profile:", err);
-        setOpponentUsername("unknown");
+        setOpponentProfile(null);
       });
   }, [match]);
 
@@ -208,17 +210,63 @@ export default function MatchDetailPage() {
               </div>
               
               <div className="flex items-center gap-4 shrink-0 rounded-lg border border-border/50 bg-muted/20 p-4">
-                <div className="text-center">
-                  <p className="text-[10px] uppercase text-muted-foreground font-bold">Your Symbol</p>
-                  <p className="mt-1 text-3xl font-black text-primary select-none">{match.symbols.you}</p>
+                <div className="flex flex-col items-center gap-1.5 text-center">
+                  <p className="text-[10px] uppercase text-muted-foreground font-bold">You</p>
+                  <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-xs select-none shadow-sm uppercase overflow-hidden">
+                    {getAvatarUrl(player?.profile?.avatarUrl) ? (
+                      <img
+                        src={getAvatarUrl(player?.profile?.avatarUrl) || undefined}
+                        alt="Your avatar"
+                        className="h-full w-full object-cover animate-in fade-in duration-200"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                          const sibling = (e.target as HTMLElement).nextElementSibling;
+                          if (sibling) sibling.classList.remove("hidden");
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={cn(
+                        "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black w-full h-full text-[10px]",
+                        getAvatarUrl(player?.profile?.avatarUrl) ? "hidden" : ""
+                      )}
+                    >
+                      {player?.profile?.username ? player.profile.username.charAt(0).toUpperCase() : "?"}
+                    </div>
+                  </div>
+                  <p className="text-3xl font-black text-primary select-none leading-none">{match.symbols.you}</p>
                 </div>
+                
                 <div className="h-8 w-px bg-border" />
-                <div className="text-center">
+                
+                <div className="flex flex-col items-center gap-1.5 text-center">
                   <p className="text-[10px] uppercase text-muted-foreground font-bold">Opponent</p>
-                  <p className="mt-1 text-xs font-semibold truncate max-w-[100px] text-muted-foreground" title={opponentUsername}>
-                    {opponentUsername}
+                  <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-xs select-none shadow-sm uppercase overflow-hidden">
+                    {opponentProfile && getAvatarUrl(opponentProfile.avatarUrl) ? (
+                      <img
+                        src={getAvatarUrl(opponentProfile.avatarUrl) || undefined}
+                        alt="Opponent's avatar"
+                        className="h-full w-full object-cover animate-in fade-in duration-200"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                          const sibling = (e.target as HTMLElement).nextElementSibling;
+                          if (sibling) sibling.classList.remove("hidden");
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={cn(
+                        "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black w-full h-full text-[10px]",
+                        opponentProfile && getAvatarUrl(opponentProfile.avatarUrl) ? "hidden" : ""
+                      )}
+                    >
+                      {opponentProfile?.username ? opponentProfile.username.charAt(0).toUpperCase() : "?"}
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold truncate max-w-[100px] text-muted-foreground leading-none" title={opponentProfile?.username || "unknown"}>
+                    {opponentProfile?.username || "unknown"}
                   </p>
-                  <p className="text-[10px] text-accent font-black select-none mt-0.5">{match.symbols.opponent}</p>
+                  <p className="text-[10px] text-accent font-black select-none leading-none">{match.symbols.opponent}</p>
                 </div>
               </div>
             </div>

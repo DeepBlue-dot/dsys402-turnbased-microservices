@@ -24,7 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, getAvatarUrl } from "@/lib/utils";
 import { playerApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameSocket } from "@/hooks/useGameSocket";
@@ -102,6 +102,7 @@ function PlayerPanel({
   status,
   symbol,
   supporting,
+  avatarUrl,
 }: {
   align?: "left" | "right";
   label: string;
@@ -112,6 +113,7 @@ function PlayerPanel({
   status: string;
   symbol: GameSymbol;
   supporting: string;
+  avatarUrl?: string | null;
 }) {
   return (
     <div className={cn(
@@ -122,15 +124,55 @@ function PlayerPanel({
         "flex items-start gap-3",
         align === "right" && "flex-row-reverse",
       )}>
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted/30 font-bold">
+        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-muted/30 font-bold overflow-hidden">
           {name === "Waiting for opponent" ? (
             <UserRound className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           ) : playerId ? (
-            <Link href={`/users/${playerId}`} className="hover:text-primary transition-colors">
-              {initials(name)}
+            <Link href={`/users/${playerId}`} className="relative w-full h-full block hover:text-primary transition-colors">
+              {getAvatarUrl(avatarUrl) ? (
+                <img
+                  src={getAvatarUrl(avatarUrl) || undefined}
+                  alt={`${name}'s avatar`}
+                  className="h-full w-full object-cover animate-in fade-in duration-200"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                    const sibling = (e.target as HTMLElement).nextElementSibling;
+                    if (sibling) sibling.classList.remove("hidden");
+                  }}
+                />
+              ) : null}
+              <div
+                className={cn(
+                  "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black w-full h-full text-xs",
+                  getAvatarUrl(avatarUrl) ? "hidden" : ""
+                )}
+              >
+                {initials(name)}
+              </div>
             </Link>
           ) : (
-            initials(name)
+            <div className="relative w-full h-full block">
+              {getAvatarUrl(avatarUrl) ? (
+                <img
+                  src={getAvatarUrl(avatarUrl) || undefined}
+                  alt={`${name}'s avatar`}
+                  className="h-full w-full object-cover animate-in fade-in duration-200"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                    const sibling = (e.target as HTMLElement).nextElementSibling;
+                    if (sibling) sibling.classList.remove("hidden");
+                  }}
+                />
+              ) : null}
+              <div
+                className={cn(
+                  "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black w-full h-full text-xs",
+                  getAvatarUrl(avatarUrl) ? "hidden" : ""
+                )}
+              >
+                {initials(name)}
+              </div>
+            </div>
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -458,6 +500,7 @@ export default function GamePage() {
             status={liveStatus !== "OFFLINE" ? liveStatus : (player?.status || user.status)}
             symbol={game?.mySymbol || "X"}
             supporting={player?.profile?.bio || "Ready in this match"}
+            avatarUrl={player?.profile?.avatarUrl}
           />
           <div className="rounded-md border border-border bg-card p-3 text-center">
             <p className="text-xs uppercase text-muted-foreground">Turn timer</p>
@@ -477,6 +520,7 @@ export default function GamePage() {
             status={opponentStatus}
             symbol={opponentSymbol}
             supporting={opponentInfo?.bio || formatLastOnline(opponentInfo?.lastOnline)}
+            avatarUrl={opponentInfo?.avatarUrl}
           />
         </div>
 

@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { playerApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { getAvatarUrl } from "@/lib/utils";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -263,9 +264,9 @@ export default function SettingsPage() {
                       <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-xl border border-dashed border-border/80 bg-muted/10">
                         {/* Current avatar preview */}
                         <div className="relative group shrink-0">
-                          {profile.avatarUrl ? (
+                          {getAvatarUrl(profile.avatarUrl) ? (
                             <img
-                              src={profile.avatarUrl}
+                              src={getAvatarUrl(profile.avatarUrl) || undefined}
                               alt="Avatar Preview"
                               className="h-16 w-16 rounded-full object-cover border border-border shadow-sm animate-in fade-in duration-200"
                               onError={(e) => {
@@ -277,7 +278,7 @@ export default function SettingsPage() {
                           ) : null}
                           <div
                             className={`h-16 w-16 rounded-full bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-xl font-black text-white shadow-sm uppercase select-none ${
-                              profile.avatarUrl ? "hidden" : ""
+                              getAvatarUrl(profile.avatarUrl) ? "hidden" : ""
                             }`}
                           >
                             {profile.username ? profile.username[0] : "?"}
@@ -368,9 +369,9 @@ export default function SettingsPage() {
                   <CardContent className="pt-0 relative px-6 pb-6">
                     {/* Avatar placement */}
                     <div className="-mt-12 mb-4 flex justify-center">
-                      {profile.avatarUrl ? (
+                      {getAvatarUrl(profile.avatarUrl) ? (
                         <img
-                          src={profile.avatarUrl}
+                          src={getAvatarUrl(profile.avatarUrl) || undefined}
                           alt="Avatar preview"
                           className="h-24 w-24 rounded-full border-4 border-background object-cover bg-card shadow-md animate-fade-in"
                           onError={(e) => {
@@ -383,7 +384,7 @@ export default function SettingsPage() {
                       ) : null}
                       <div
                         className={`h-24 w-24 rounded-full border-4 border-background bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-3xl font-black text-white shadow-md uppercase select-none ${
-                          profile.avatarUrl ? "hidden" : ""
+                          getAvatarUrl(profile.avatarUrl) ? "hidden" : ""
                         }`}
                       >
                         {profile.username ? profile.username[0] : "?"}

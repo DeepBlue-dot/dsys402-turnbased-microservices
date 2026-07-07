@@ -6,7 +6,7 @@ import { ArrowLeft, Trophy, Swords, ShieldAlert, Handshake, Calendar, User } fro
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { playerApi } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, getAvatarUrl } from "@/lib/utils";
 import type { PublicPlayerInfo } from "@/lib/types";
 
 function StatusPill({ status }: { status: string }) {
@@ -99,9 +99,27 @@ export default function PlayerProfilePage() {
       {/* Profile Header Card */}
       <Card className="relative overflow-hidden border border-border/80 bg-card/40 backdrop-blur p-6">
         <div className="flex flex-col sm:flex-row items-center gap-6">
-          {/* Avatar circle with initials */}
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-3xl select-none shadow-md">
-            {profile.username ? profile.username.charAt(0).toUpperCase() : "?"}
+          {/* Avatar circle with image or initials */}
+          <div className="relative shrink-0">
+            {getAvatarUrl(profile.avatarUrl) ? (
+              <img
+                src={getAvatarUrl(profile.avatarUrl) || undefined}
+                alt={`${profile.username || "player"}'s avatar`}
+                className="h-20 w-20 rounded-full object-cover border border-border shadow-sm animate-in fade-in duration-200"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = "none";
+                  const sibling = (e.target as HTMLElement).nextElementSibling;
+                  if (sibling) sibling.classList.remove("hidden");
+                }}
+              />
+            ) : null}
+            <div
+              className={`flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-3xl select-none shadow-md uppercase ${
+                getAvatarUrl(profile.avatarUrl) ? "hidden" : ""
+              }`}
+            >
+              {profile.username ? profile.username.charAt(0).toUpperCase() : "?"}
+            </div>
           </div>
 
           <div className="text-center sm:text-left space-y-2 flex-1">

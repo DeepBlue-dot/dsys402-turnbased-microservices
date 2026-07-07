@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { playerApi } from "@/lib/api";
 import type { PlayerSearchItem } from "@/lib/types";
+import { getAvatarUrl } from "@/lib/utils";
 
 export default function UsersPage() {
   const [players, setPlayers] = useState<PlayerSearchItem[]>([]);
@@ -68,9 +69,27 @@ export default function UsersPage() {
             <Link href={`/users/${player.id}`} key={player.id} className="block">
               <Card className="group relative overflow-hidden border border-border/80 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:shadow-md hover:border-primary/20 hover:-translate-y-0.5">
                 <CardContent className="p-4 flex items-center gap-4">
-                  {/* Initials Avatar */}
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-lg select-none shadow-sm">
-                    {player.username ? player.username.charAt(0).toUpperCase() : "?"}
+                  {/* Player Avatar */}
+                  <div className="relative shrink-0">
+                    {getAvatarUrl(player.avatarUrl) ? (
+                      <img
+                        src={getAvatarUrl(player.avatarUrl) || undefined}
+                        alt={`${player.username || "player"}'s avatar`}
+                        className="h-12 w-12 rounded-full object-cover border border-border shadow-sm animate-in fade-in duration-200"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                          const sibling = (e.target as HTMLElement).nextElementSibling;
+                          if (sibling) sibling.classList.remove("hidden");
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-lg select-none shadow-sm uppercase ${
+                        getAvatarUrl(player.avatarUrl) ? "hidden" : ""
+                      }`}
+                    >
+                      {player.username ? player.username.charAt(0).toUpperCase() : "?"}
+                    </div>
                   </div>
 
                   {/* Player Name and Elo */}

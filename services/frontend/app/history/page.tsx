@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { historyApi, playerApi } from "@/lib/api";
-import { cn } from "@/lib/utils";
-import type { GameResult, MatchHistoryItem, BoardCell } from "@/lib/types";
+import { cn, getAvatarUrl } from "@/lib/utils";
+import type { GameResult, MatchHistoryItem, BoardCell, PublicPlayerInfo } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 
 function normalizeBoard(board?: BoardCell[]) {
@@ -42,7 +42,7 @@ export default function HistoryPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [usernames, setUsernames] = useState<Record<string, string>>({});
+  const [opponentProfiles, setOpponentProfiles] = useState<Record<string, PublicPlayerInfo>>({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -51,12 +51,12 @@ export default function HistoryPage() {
       new Set(matches.map((m) => m.opponentId).filter((id): id is string => !!id))
     );
     opponentIds.forEach((id) => {
-      setUsernames((prev) => {
+      setOpponentProfiles((prev) => {
         if (prev[id]) return prev;
         playerApi
           .publicProfile(id)
           .then((profile) => {
-            setUsernames((p) => ({ ...p, [id]: profile.username }));
+            setOpponentProfiles((p) => ({ ...p, [id]: profile }));
           })
           .catch((err) => {
             console.error(`Failed to fetch profile for player ${id}:`, err);
@@ -228,9 +228,40 @@ export default function HistoryPage() {
                       </>
                     )}
                   </div>
-                  <p className="mt-1 font-bold text-base truncate">
-                    vs <span className="font-semibold text-foreground">{match.opponentId ? (usernames[match.opponentId] || "Loading...") : "unknown"}</span>
-                  </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-sm font-medium text-muted-foreground">vs</span>
+                    <div className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-[10px] select-none shadow-sm uppercase overflow-hidden">
+                      {match.opponentId && opponentProfiles[match.opponentId] ? (
+                        <>
+                          {getAvatarUrl(opponentProfiles[match.opponentId].avatarUrl) ? (
+                            <img
+                              src={getAvatarUrl(opponentProfiles[match.opponentId].avatarUrl) || undefined}
+                              alt={`${opponentProfiles[match.opponentId].username}'s avatar`}
+                              className="h-full w-full object-cover animate-in fade-in duration-200"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                                const sibling = (e.target as HTMLElement).nextElementSibling;
+                                if (sibling) sibling.classList.remove("hidden");
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={cn(
+                              "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black text-[10px] w-full h-full",
+                              getAvatarUrl(opponentProfiles[match.opponentId].avatarUrl) ? "hidden" : ""
+                            )}
+                          >
+                            {opponentProfiles[match.opponentId].username.charAt(0).toUpperCase()}
+                          </div>
+                        </>
+                      ) : (
+                        "?"
+                      )}
+                    </div>
+                    <span className="font-bold text-base truncate text-foreground">
+                      {match.opponentId ? (opponentProfiles[match.opponentId]?.username || "Loading...") : "unknown"}
+                    </span>
+                  </div>
                   <p className="mt-1 text-xs text-muted-foreground/70">
                     {new Date(match.endedAt).toLocaleDateString(undefined, {
                       month: "short",
