@@ -98,6 +98,34 @@ async function createMatch(p1: string, p2: string, r1: number, r2: number) {
       redis.hgetall(`presence:${p2}`),
     ]);
 
+    // Validation: Both players must be online and in QUEUED status
+    const p1Valid = p1Data && Object.keys(p1Data).length > 0 && p1Data.status === "QUEUED";
+    const p2Valid = p2Data && Object.keys(p2Data).length > 0 && p2Data.status === "QUEUED";
+
+    if (!p1Valid || !p2Valid) {
+      console.log(`[Matchmaker] Aborting match creation. Player validation failed. P1: ${p1Valid}, P2: ${p2Valid}`);
+
+      const pipeline = redis.pipeline();
+      // Handle player 1
+      if (p1Valid) {
+        pipeline.zadd(QUEUE_KEY, r1, p1);
+        pipeline.hset(JOIN_TIMES_KEY, p1, (Date.now() - 30000).toString());
+      } else {
+        pipeline.hdel(JOIN_TIMES_KEY, p1);
+      }
+
+      // Handle player 2
+      if (p2Valid) {
+        pipeline.zadd(QUEUE_KEY, r2, p2);
+        pipeline.hset(JOIN_TIMES_KEY, p2, (Date.now() - 30000).toString());
+      } else {
+        pipeline.hdel(JOIN_TIMES_KEY, p2);
+      }
+
+      await pipeline.exec();
+      return;
+    }
+
     const pipeline = redis.pipeline();
 
     pipeline.hdel(JOIN_TIMES_KEY, p1, p2);
@@ -137,15 +165,30 @@ async function createMatch(p1: string, p2: string, r1: number, r2: number) {
       "[Matchmaker] CRITICAL: Match finalization failed. Rolling back players to queue...",
     );
 
-    await redis
-      .pipeline()
-      .hset(`presence:${p1}`, "status", "QUEUED")
-      .hset(`presence:${p2}`, "status", "QUEUED")
-      .zadd(QUEUE_KEY, r1, p1)
-      .zadd(QUEUE_KEY, r2, p2)
-      .hset(JOIN_TIMES_KEY, p1, (Date.now() - 30000).toString()) // Re-queue at the front
-      .hset(JOIN_TIMES_KEY, p2, (Date.now() - 30000).toString())
-      .exec();
+    try {
+      const [p1Data, p2Data] = await Promise.all([
+        redis.hgetall(`presence:${p1}`),
+        redis.hgetall(`presence:${p2}`),
+      ]);
+      const pipeline = redis.pipeline();
+      if (p1Data && Object.keys(p1Data).length > 0) {
+        pipeline.hset(`presence:${p1}`, "status", "QUEUED")
+                .zadd(QUEUE_KEY, r1, p1)
+                .hset(JOIN_TIMES_KEY, p1, (Date.now() - 30000).toString());
+      } else {
+        pipeline.hdel(JOIN_TIMES_KEY, p1);
+      }
+      if (p2Data && Object.keys(p2Data).length > 0) {
+        pipeline.hset(`presence:${p2}`, "status", "QUEUED")
+                .zadd(QUEUE_KEY, r2, p2)
+                .hset(JOIN_TIMES_KEY, p2, (Date.now() - 30000).toString());
+      } else {
+        pipeline.hdel(JOIN_TIMES_KEY, p2);
+      }
+      await pipeline.exec();
+    } catch (rollbackErr) {
+      console.error("[Matchmaker] Rollback failed:", rollbackErr);
+    }
   }
 }
 

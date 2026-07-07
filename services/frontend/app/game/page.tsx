@@ -17,7 +17,6 @@ import {
   Radio,
   RefreshCcw,
   Send,
-  ShieldAlert,
   Swords,
   UserRound,
 } from "lucide-react";

@@ -410,10 +410,10 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
         }
         case "REMATCH_EXPIRED": {
           setRematchState((prev) => {
-            if (!prev) return null;
             return {
-              ...prev,
               status: "expired",
+              requestedBy: prev?.requestedBy || "",
+              players: prev?.players || [],
             };
           });
           setNotice("Rematch request expired");

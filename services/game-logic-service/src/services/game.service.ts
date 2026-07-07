@@ -377,7 +377,16 @@ export const gameService = {
   async handleRematchRequest(matchId: string, userId: string) {
     const key = `game:rematch:${matchId}`;
     const rematch = await redis.hgetall(key);
-    if (!rematch || Object.keys(rematch).length === 0) return;
+    if (!rematch || Object.keys(rematch).length === 0) {
+      const loc = await this.getPlayerLocation(userId);
+      if (loc) {
+        await publishEvent(`game.event.rematch_expired.${loc.instanceId}`, {
+          recipientId: userId,
+          matchId,
+        });
+      }
+      return;
+    }
 
     const players: string[] = JSON.parse(rematch.players);
     if (!players.includes(userId)) return;
@@ -387,6 +396,29 @@ export const gameService = {
 
     if (currentStatus === "idle") {
       // Transition to pending
+      const opponentId = players.find((id) => id !== userId)!;
+      const opponentPresence = await redis.hgetall(`${PRESENCE_PREFIX}${opponentId}`);
+      if (opponentPresence && opponentPresence.status === "IN_GAME") {
+        // Opponent is already in a game, expire rematch
+        await redis.pipeline()
+          .del(key)
+          .zrem("rematch:timers", matchId)
+          .exec();
+
+        const locations = await Promise.all(
+          players.map((id) => this.getPlayerLocation(id))
+        );
+        for (const loc of locations) {
+          if (loc) {
+            await publishEvent(`game.event.rematch_expired.${loc.instanceId}`, {
+              recipientId: loc.userId,
+              matchId,
+            });
+          }
+        }
+        return;
+      }
+
       await redis.pipeline()
         .hset(key, { status: "pending", requestedBy: userId })
         .zadd("rematch:timers", Date.now() + 30000, matchId)
@@ -409,10 +441,43 @@ export const gameService = {
     } else if (currentStatus === "pending") {
       if (requestedBy !== userId) {
         // Both players agreed -> REMATCH ACCEPTED!
-        // Delete rematch record and timer
+
+        // Verify both players are online and not IN_GAME
+        const [p1Presence, p2Presence] = await Promise.all([
+          redis.hgetall(`${PRESENCE_PREFIX}${players[0]}`),
+          redis.hgetall(`${PRESENCE_PREFIX}${players[1]}`),
+        ]);
+
+        const p1Valid = p1Presence && Object.keys(p1Presence).length > 0 && p1Presence.status !== "IN_GAME";
+        const p2Valid = p2Presence && Object.keys(p2Presence).length > 0 && p2Presence.status !== "IN_GAME";
+
+        if (!p1Valid || !p2Valid) {
+          // One or both players are in-game or offline, expire rematch
+          await redis.pipeline()
+            .del(key)
+            .zrem("rematch:timers", matchId)
+            .exec();
+
+          const locations = await Promise.all(
+            players.map((id) => this.getPlayerLocation(id))
+          );
+          for (const loc of locations) {
+            if (loc) {
+              await publishEvent(`game.event.rematch_expired.${loc.instanceId}`, {
+                recipientId: loc.userId,
+                matchId,
+              });
+            }
+          }
+          return;
+        }
+
+        // Delete rematch record and timer, and evict them from matchmaking queue if they queued
         await redis.pipeline()
           .del(key)
           .zrem("rematch:timers", matchId)
+          .zrem("match:queue:ranked", players[0], players[1])
+          .hdel("match:join_times", players[0], players[1])
           .exec();
 
         const newMatchId = uuidv4();
