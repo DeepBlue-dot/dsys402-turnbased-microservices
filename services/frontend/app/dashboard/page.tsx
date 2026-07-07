@@ -1,19 +1,16 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BarChart3,
-  History,
   LogOut,
   Play,
   Radio,
   RefreshCcw,
   Swords,
   Trophy,
-  X,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,18 +20,11 @@ import { StatusPill } from "@/components/dashboard/status-pill";
 import { GameHubMatch } from "@/components/game/game-hub-match";
 import { GameHubQueue } from "@/components/game/game-hub-queue";
 import { LiveFeed } from "@/components/game/live-feed";
-import { historyApi, matchmakingApi, playerApi } from "@/lib/api";
+import { historyApi, matchmakingApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameSocket } from "@/hooks/useGameSocket";
 import type { CurrentPlayerState, MatchHistoryItem } from "@/lib/types";
-
-type ActivePanel = "home" | "history";
-
-function formatOpponentName(match: MatchHistoryItem, usernames: Record<string, string>) {
-  if (!match.opponentId) return "unknown";
-  return usernames[match.opponentId] || "Loading...";
-}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -50,10 +40,8 @@ export default function DashboardPage() {
     notice,
     sync,
   } = useGameSocket(!!user);
-  const [activePanel, setActivePanel] = useState<ActivePanel>("home");
   const [queueIntent, setQueueIntent] = useState(false);
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
-  const [usernames, setUsernames] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState<string | null>(null);
 
   const livePlayer = useMemo<CurrentPlayerState | null>(() => {
@@ -100,7 +88,6 @@ export default function DashboardPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("queue") === "1") {
       setQueueIntent(true);
-      setActivePanel("home");
       router.replace("/dashboard");
     }
   }, [router]);
@@ -116,30 +103,8 @@ export default function DashboardPage() {
   }, [loadHistory]);
 
   useEffect(() => {
-    const opponentIds = Array.from(
-      new Set(history.map((match) => match.opponentId).filter((id): id is string => !!id)),
-    );
-
-    opponentIds.forEach((id) => {
-      setUsernames((prev) => {
-        if (prev[id]) return prev;
-        playerApi
-          .publicProfile(id)
-          .then((profile) => {
-            setUsernames((current) => ({ ...current, [id]: profile.username }));
-          })
-          .catch(() => {
-            setUsernames((current) => ({ ...current, [id]: "unknown" }));
-          });
-        return prev;
-      });
-    });
-  }, [history]);
-
-  useEffect(() => {
     if (hasActiveGame) {
       setQueueIntent(false);
-      setActivePanel("home");
     }
   }, [hasActiveGame]);
 
@@ -158,16 +123,13 @@ export default function DashboardPage() {
   const handleFindMatch = useCallback(() => {
     setActionError(null);
     setQueueIntent(true);
-    setActivePanel("home");
   }, []);
 
   const handleReturnToHub = useCallback(() => {
-    setActivePanel("home");
     loadHistory();
   }, [loadHistory]);
 
   const handleOpenHistory = useCallback(() => {
-    setActivePanel("history");
     loadHistory();
   }, [loadHistory]);
 
@@ -211,10 +173,6 @@ export default function DashboardPage() {
             <RefreshCcw className="h-4 w-4" aria-hidden="true" />
             Sync
           </Button>
-          <Button variant="outline" onClick={handleOpenHistory}>
-            <History className="h-4 w-4" aria-hidden="true" />
-            History
-          </Button>
           {isQueued ? (
             <Button variant="outline" onClick={() => void handleLeaveQueue()}>
               <XCircle className="h-4 w-4" aria-hidden="true" />
@@ -236,73 +194,6 @@ export default function DashboardPage() {
       {actionError && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {actionError}
-        </div>
-      )}
-
-      {activePanel === "history" && (
-        <div className="fixed inset-0 z-40 bg-background/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="ml-auto flex h-full w-full max-w-xl flex-col rounded-md border border-border bg-card shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border p-4">
-              <div>
-                <h2 className="text-lg font-bold">Recent Matches</h2>
-                <p className="text-sm text-muted-foreground">Replay links still open as deep links.</p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setActivePanel("home")}>
-                <X className="h-4 w-4" aria-hidden="true" />
-                <span className="sr-only">Close history</span>
-              </Button>
-            </div>
-            <div className="flex-1 space-y-3 overflow-y-auto p-4">
-              {history.length === 0 ? (
-                <Card className="border-dashed bg-card/50">
-                  <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                    No saved matches yet. Finish a game and it will appear here.
-                  </CardContent>
-                </Card>
-              ) : (
-                history.map((match) => (
-                  <div
-                    key={match.matchId}
-                    className="flex items-center justify-between gap-4 rounded-md border border-border bg-background/40 p-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            "rounded-md px-2 py-1 text-xs font-bold",
-                            match.result === "WIN" && "bg-green-400/10 text-green-300",
-                            match.result === "LOSS" && "bg-red-400/10 text-red-300",
-                            match.result === "DRAW" && "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {match.result}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(match.endedAt).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
-                      <p className="mt-1 truncate text-sm">
-                        vs {formatOpponentName(match, usernames)} · {match.turnCount} turns
-                      </p>
-                    </div>
-                    <Link href={`/history/${match.matchId}`}>
-                      <Button variant="outline" size="sm">Replay</Button>
-                    </Link>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="border-t border-border p-4">
-              <Link href="/history">
-                <Button variant="outline" className="w-full">Open Full History</Button>
-              </Link>
-            </div>
-          </div>
         </div>
       )}
 
@@ -365,10 +256,6 @@ export default function DashboardPage() {
                   <Button size="lg" onClick={handleFindMatch} className="font-bold">
                     <Play className="h-4 w-4" aria-hidden="true" />
                     Find Match
-                  </Button>
-                  <Button variant="outline" size="lg" onClick={handleOpenHistory}>
-                    <History className="h-4 w-4" aria-hidden="true" />
-                    Recent History
                   </Button>
                 </div>
               </CardContent>

@@ -265,9 +265,11 @@ export default function SettingsPage() {
                         {/* Current avatar preview */}
                         <div className="relative group shrink-0">
                           {getAvatarUrl(profile.avatarUrl) ? (
-                            <img
-                              src={getAvatarUrl(profile.avatarUrl) || undefined}
+                            <Image
+                              src={getAvatarUrl(profile.avatarUrl) || ""}
                               alt="Avatar Preview"
+                              width={64}
+                              height={64}
                               className="h-16 w-16 rounded-full object-cover border border-border shadow-sm animate-in fade-in duration-200"
                               onError={(e) => {
                                 (e.target as HTMLElement).style.display = "none";
@@ -370,9 +372,11 @@ export default function SettingsPage() {
                     {/* Avatar placement */}
                     <div className="-mt-12 mb-4 flex justify-center">
                       {getAvatarUrl(profile.avatarUrl) ? (
-                        <img
-                          src={getAvatarUrl(profile.avatarUrl) || undefined}
+                        <Image
+                          src={getAvatarUrl(profile.avatarUrl) || ""}
                           alt="Avatar preview"
+                          width={96}
+                          height={96}
                           className="h-24 w-24 rounded-full border-4 border-background object-cover bg-card shadow-md animate-fade-in"
                           onError={(e) => {
                             // Fallback on image error

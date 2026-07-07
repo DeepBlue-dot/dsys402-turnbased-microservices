@@ -3,6 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Trophy, Swords, ShieldAlert, Handshake, Calendar, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -104,9 +105,11 @@ export default function PlayerProfilePage() {
           {/* Avatar circle with image or initials */}
           <div className="relative shrink-0">
             {getAvatarUrl(profile.avatarUrl) ? (
-              <img
-                src={getAvatarUrl(profile.avatarUrl) || undefined}
+              <Image
+                src={getAvatarUrl(profile.avatarUrl) || ""}
                 alt={`${profile.username || "player"}'s avatar`}
+                width={80}
+                height={80}
                 className="h-20 w-20 rounded-full object-cover border border-border shadow-sm animate-in fade-in duration-200"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = "none";

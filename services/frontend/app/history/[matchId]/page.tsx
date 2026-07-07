@@ -2,12 +2,13 @@
 
 /* eslint-disable react-hooks/set-state-in-effect */
 
+import Image from "next/image";
 import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { 
   ArrowLeft, Play, Pause, ChevronLeft, ChevronRight, RotateCcw, 
-  Clock, Swords, Calendar, Activity, User, Trophy, ShieldAlert
-} from "lucide-react";
+  Clock, Calendar, Activity} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { historyApi, playerApi } from "@/lib/api";
@@ -214,12 +215,14 @@ export default function MatchDetailPage() {
               <div className="flex items-center gap-4 shrink-0 rounded-lg border border-border/50 bg-muted/20 p-4">
                 <div className="flex flex-col items-center gap-1.5 text-center">
                   <p className="text-[10px] uppercase text-muted-foreground font-bold">You</p>
-                  <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-xs select-none shadow-sm uppercase overflow-hidden">
+                  <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br from-primary to-accent font-black text-white text-xs select-none shadow-sm uppercase overflow-hidden">
                     {getAvatarUrl(player?.profile?.avatarUrl) ? (
-                      <img
-                        src={getAvatarUrl(player?.profile?.avatarUrl) || undefined}
+                      <Image
+                        src={getAvatarUrl(player?.profile?.avatarUrl) || ""}
                         alt="Your avatar"
-                        className="h-full w-full object-cover animate-in fade-in duration-200"
+                        fill
+                        sizes="32px"
+                        className="object-cover animate-in fade-in duration-200"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = "none";
                           const sibling = (e.target as HTMLElement).nextElementSibling;
@@ -229,7 +232,7 @@ export default function MatchDetailPage() {
                     ) : null}
                     <div
                       className={cn(
-                        "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black w-full h-full text-[10px]",
+                        "flex h-full w-full items-center justify-center bg-linear-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black text-[10px]",
                         getAvatarUrl(player?.profile?.avatarUrl) ? "hidden" : ""
                       )}
                     >
@@ -243,31 +246,44 @@ export default function MatchDetailPage() {
                 
                 <div className="flex flex-col items-center gap-1.5 text-center">
                   <p className="text-[10px] uppercase text-muted-foreground font-bold">Opponent</p>
-                  <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-xs select-none shadow-sm uppercase overflow-hidden">
-                    {opponentProfile && getAvatarUrl(opponentProfile.avatarUrl) ? (
-                      <img
-                        src={getAvatarUrl(opponentProfile.avatarUrl) || undefined}
-                        alt="Opponent's avatar"
-                        className="h-full w-full object-cover animate-in fade-in duration-200"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = "none";
-                          const sibling = (e.target as HTMLElement).nextElementSibling;
-                          if (sibling) sibling.classList.remove("hidden");
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className={cn(
-                        "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black w-full h-full text-[10px]",
-                        opponentProfile && getAvatarUrl(opponentProfile.avatarUrl) ? "hidden" : ""
-                      )}
-                    >
-                      {opponentProfile?.username ? opponentProfile.username.charAt(0).toUpperCase() : "?"}
+                  {match.players.opponent ? (
+                    <Link href={`/users/${match.players.opponent}`} className="flex flex-col items-center gap-1.5">
+                      <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br from-primary to-accent font-black text-white text-xs select-none shadow-sm uppercase overflow-hidden">
+                        {opponentProfile && getAvatarUrl(opponentProfile.avatarUrl) ? (
+                          <Image
+                            src={getAvatarUrl(opponentProfile.avatarUrl) || ""}
+                            alt="Opponent's avatar"
+                            fill
+                            sizes="32px"
+                            className="object-cover animate-in fade-in duration-200"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                              const sibling = (e.target as HTMLElement).nextElementSibling;
+                              if (sibling) sibling.classList.remove("hidden");
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={cn(
+                            "flex h-full w-full items-center justify-center bg-linear-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black text-[10px]",
+                            opponentProfile && getAvatarUrl(opponentProfile.avatarUrl) ? "hidden" : ""
+                          )}
+                        >
+                          {opponentProfile?.username ? opponentProfile.username.charAt(0).toUpperCase() : "?"}
+                        </div>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold truncate max-w-25 text-muted-foreground leading-none hover:text-primary transition-colors" title={opponentProfile?.username || "unknown"}>
+                        {opponentProfile?.username || "unknown"}
+                      </p>
+                    </Link>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br from-primary to-accent font-black text-white text-xs select-none shadow-sm uppercase overflow-hidden">
+                        ?
+                      </div>
+                      <p className="mt-1 text-xs font-semibold truncate max-w-25 text-muted-foreground leading-none">unknown</p>
                     </div>
-                  </div>
-                  <p className="mt-1 text-xs font-semibold truncate max-w-[100px] text-muted-foreground leading-none" title={opponentProfile?.username || "unknown"}>
-                    {opponentProfile?.username || "unknown"}
-                  </p>
+                  )}
                   <p className="text-[10px] text-accent font-black select-none leading-none">{match.symbols.opponent}</p>
                 </div>
               </div>
@@ -337,7 +353,7 @@ export default function MatchDetailPage() {
             </Card>
 
             {/* Move Timeline Log Panel */}
-            <Card className="border border-border/80 bg-card/60 backdrop-blur-sm max-h-[500px] flex flex-col">
+            <Card className="border border-border/80 bg-card/60 backdrop-blur-sm max-h-125 flex flex-col">
               <CardHeader className="border-b border-border/50 pb-4">
                 <CardTitle className="text-base font-extrabold flex items-center gap-2">
                   <Activity className="h-4 w-4 text-primary" /> Move Timeline
@@ -372,7 +388,7 @@ export default function MatchDetailPage() {
                         >
                           {/* Timeline dot */}
                           <div className={cn(
-                            "absolute -left-[31px] top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full border bg-background transition-all duration-200",
+                            "absolute -left-7.75 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-full border bg-background transition-all duration-200",
                             isActive 
                               ? "border-primary bg-primary text-white scale-110"
                               : isFuture
@@ -386,7 +402,7 @@ export default function MatchDetailPage() {
                             <p className="text-xs font-semibold text-foreground/90">
                               Move {index + 1}: <span className="font-mono text-primary">{move.symbol}</span> placed on square {move.position + 1}
                             </p>
-                            <p className="mt-1 text-[10px] text-muted-foreground/80 font-mono truncate max-w-[280px]">
+                            <p className="mt-1 text-[10px] text-muted-foreground/80 font-mono truncate max-w-70">
                               Grid row {row}, col {col}
                             </p>
                           </div>

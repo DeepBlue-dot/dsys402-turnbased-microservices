@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Filter, Search, Trophy, Swords, ShieldAlert, Handshake, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -230,37 +231,50 @@ export default function HistoryPage() {
                   </div>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="text-sm font-medium text-muted-foreground">vs</span>
-                    <div className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-[10px] select-none shadow-sm uppercase overflow-hidden">
-                      {match.opponentId && opponentProfiles[match.opponentId] ? (
-                        <>
-                          {getAvatarUrl(opponentProfiles[match.opponentId].avatarUrl) ? (
-                            <img
-                              src={getAvatarUrl(opponentProfiles[match.opponentId].avatarUrl) || undefined}
-                              alt={`${opponentProfiles[match.opponentId].username}'s avatar`}
-                              className="h-full w-full object-cover animate-in fade-in duration-200"
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = "none";
-                                const sibling = (e.target as HTMLElement).nextElementSibling;
-                                if (sibling) sibling.classList.remove("hidden");
-                              }}
-                            />
-                          ) : null}
-                          <div
-                            className={cn(
-                              "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black text-[10px] w-full h-full",
-                              getAvatarUrl(opponentProfiles[match.opponentId].avatarUrl) ? "hidden" : ""
-                            )}
-                          >
-                            {opponentProfiles[match.opponentId].username.charAt(0).toUpperCase()}
-                          </div>
-                        </>
-                      ) : (
-                        "?"
-                      )}
-                    </div>
-                    <span className="font-bold text-base truncate text-foreground">
-                      {match.opponentId ? (opponentProfiles[match.opponentId]?.username || "Loading...") : "unknown"}
-                    </span>
+                    {match.opponentId ? (
+                      <Link href={`/users/${match.opponentId}`} className="flex items-center gap-2 min-w-0">
+                        <div className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-[10px] select-none shadow-sm uppercase overflow-hidden">
+                          {opponentProfiles[match.opponentId] ? (
+                            <>
+                              {getAvatarUrl(opponentProfiles[match.opponentId].avatarUrl) ? (
+                                <Image
+                                  src={getAvatarUrl(opponentProfiles[match.opponentId].avatarUrl) || ""}
+                                  alt={`${opponentProfiles[match.opponentId].username}'s avatar`}
+                                  width={24}
+                                  height={24}
+                                  className="h-full w-full object-cover animate-in fade-in duration-200"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = "none";
+                                    const sibling = (e.target as HTMLElement).nextElementSibling;
+                                    if (sibling) sibling.classList.remove("hidden");
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className={cn(
+                                  "flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-accent/80 text-white select-none uppercase font-black text-[10px] w-full h-full",
+                                  getAvatarUrl(opponentProfiles[match.opponentId].avatarUrl) ? "hidden" : ""
+                                )}
+                              >
+                                {opponentProfiles[match.opponentId].username.charAt(0).toUpperCase()}
+                              </div>
+                            </>
+                          ) : (
+                            "?"
+                          )}
+                        </div>
+                        <span className="font-bold text-base truncate text-foreground hover:text-primary transition-colors">
+                          {opponentProfiles[match.opponentId]?.username || "Loading..."}
+                        </span>
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent font-black text-white text-[10px] select-none shadow-sm uppercase overflow-hidden">
+                          ?
+                        </div>
+                        <span className="font-bold text-base truncate text-foreground">unknown</span>
+                      </div>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground/70">
                     {new Date(match.endedAt).toLocaleDateString(undefined, {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Search, Trophy, Swords, ShieldAlert, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -72,9 +73,11 @@ export default function UsersPage() {
                   {/* Player Avatar */}
                   <div className="relative shrink-0">
                     {getAvatarUrl(player.avatarUrl) ? (
-                      <img
-                        src={getAvatarUrl(player.avatarUrl) || undefined}
+                      <Image
+                        src={getAvatarUrl(player.avatarUrl) || ""}
                         alt={`${player.username || "player"}'s avatar`}
+                        width={48}
+                        height={48}
                         className="h-12 w-12 rounded-full object-cover border border-border shadow-sm animate-in fade-in duration-200"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = "none";
