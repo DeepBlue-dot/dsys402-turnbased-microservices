@@ -56,10 +56,35 @@ export default function MatchmakingPage() {
   }, [loading, router, user]);
 
   useEffect(() => {
-    if (!queueStartedAt) return;
+    if (!isConnected) {
+      requestedJoinRef.current = false;
+    }
+  }, [isConnected]);
+
+  useEffect(() => {
+    if (livePlayer?.status === "QUEUED" && livePlayer.queue) {
+      const initialWait = livePlayer.queue.waitTimeSeconds || 0;
+      const calculatedStart = Date.now() - initialWait * 1000;
+      setQueueStartedAt((prev) => {
+        if (prev === null || Math.abs(prev - calculatedStart) > 2000) {
+          return calculatedStart;
+        }
+        return prev;
+      });
+    } else if (livePlayer?.status !== "QUEUED") {
+      setQueueStartedAt(null);
+      setElapsed(0);
+    }
+  }, [livePlayer?.status, livePlayer?.queue, livePlayer?.queue?.waitTimeSeconds]);
+
+  useEffect(() => {
+    if (!queueStartedAt) {
+      setElapsed(0);
+      return;
+    }
 
     const timer = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - queueStartedAt) / 1000));
+      setElapsed(Math.max(0, Math.floor((Date.now() - queueStartedAt) / 1000)));
     }, 1000);
 
     return () => clearInterval(timer);
@@ -80,7 +105,7 @@ export default function MatchmakingPage() {
   }, [liveStatus, livePlayer?.game, router, joining]);
 
   useEffect(() => {
-    if (!isConnected || !user || requestedJoinRef.current) return;
+    if (!isConnected || !user || !player || requestedJoinRef.current) return;
 
     if (livePlayer?.status === "IN_GAME" || (livePlayer?.game && livePlayer.game.status === "ACTIVE")) {
       router.push("/game");
@@ -89,7 +114,8 @@ export default function MatchmakingPage() {
 
     if (livePlayer?.status === "QUEUED") {
       requestedJoinRef.current = true;
-      setQueueStartedAt(Date.now());
+      const initialWait = livePlayer.queue?.waitTimeSeconds || 0;
+      setQueueStartedAt(Date.now() - initialWait * 1000);
       return;
     }
 
@@ -113,7 +139,7 @@ export default function MatchmakingPage() {
         setError(message);
       })
       .finally(() => setJoining(false));
-  }, [isConnected, livePlayer?.game, livePlayer?.status, refreshUser, router, user, clearNotice]);
+  }, [isConnected, player, livePlayer?.game, livePlayer?.status, refreshUser, router, user, clearNotice]);
 
   async function leaveQueue() {
     setError(null);
@@ -134,7 +160,7 @@ export default function MatchmakingPage() {
     );
   }
 
-  const waitTime = livePlayer?.queue?.waitTimeSeconds ?? elapsed;
+  const waitTime = elapsed;
   const position = livePlayer?.queue?.position;
 
   return (

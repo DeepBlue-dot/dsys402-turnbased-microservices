@@ -401,23 +401,17 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
         }
         case "REMATCH_STATUS": {
           setRematchState(message.data);
-          const isFromMe = message.data.requestedBy === userId;
-          addFeedItem(
-            "Rematch status",
-            isFromMe ? "You requested a rematch." : "Opponent requested a rematch."
-          );
           break;
         }
         case "REMATCH_EXPIRED": {
           setRematchState((prev) => {
             return {
+              matchId: prev?.matchId || "",
               status: "expired",
               requestedBy: prev?.requestedBy || "",
-              players: prev?.players || [],
             };
           });
           setNotice("Rematch request expired");
-          addFeedItem("Rematch expired", "The rematch offer has expired or was declined.");
           break;
         }
         case "chat.status": {
