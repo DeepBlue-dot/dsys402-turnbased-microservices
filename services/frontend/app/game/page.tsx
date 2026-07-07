@@ -394,7 +394,7 @@ export default function GamePage() {
             name={currentPlayerName}
             rating={currentPlayerRating}
             record={formatRecord(currentPlayerStats)}
-            status={player?.status || user.status}
+            status={liveStatus !== "OFFLINE" ? liveStatus : (player?.status || user.status)}
             symbol={game.mySymbol}
             supporting={player?.profile?.bio || "Ready in this match"}
           />

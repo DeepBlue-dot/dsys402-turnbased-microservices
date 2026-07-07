@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -46,6 +46,7 @@ function StatusPill({ status }: { status: PlayerStatus | string }) {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const prevStatusRef = useRef<PlayerStatus | null>(null);
   const { loading, logout, player, refreshUser, user } = useAuth();
   const {
     connectionState,
@@ -76,9 +77,12 @@ export default function DashboardPage() {
   }, [loading, router, user]);
 
   useEffect(() => {
-    if (liveStatus === "IN_GAME") {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = liveStatus;
+
+    if (prevStatus && prevStatus !== "OFFLINE" && prevStatus !== "IN_GAME" && liveStatus === "IN_GAME") {
       router.push("/game");
-    } else if (liveStatus === "QUEUED") {
+    } else if (prevStatus && prevStatus !== "OFFLINE" && prevStatus !== "QUEUED" && liveStatus === "QUEUED") {
       router.push("/matchmaking");
     }
   }, [liveStatus, router]);
@@ -239,7 +243,7 @@ export default function DashboardPage() {
                 </div>
               </>
             )}
-            {livePlayer.game && (
+            {livePlayer.game && livePlayer.game.status === "ACTIVE" && (
               <>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Match</span>

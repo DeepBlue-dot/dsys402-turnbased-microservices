@@ -65,7 +65,7 @@ export default function MatchmakingPage() {
   }, [queueStartedAt]);
 
   useEffect(() => {
-    if (liveStatus === "IN_GAME" || livePlayer?.game) {
+    if (liveStatus === "IN_GAME" || (livePlayer?.game && livePlayer.game.status === "ACTIVE")) {
       router.push("/game");
     } else if (liveStatus === "IDLE" && requestedJoinRef.current && !joining) {
       router.push("/dashboard");
@@ -75,7 +75,7 @@ export default function MatchmakingPage() {
   useEffect(() => {
     if (!isConnected || !user || requestedJoinRef.current) return;
 
-    if (livePlayer?.status === "IN_GAME" || livePlayer?.game) {
+    if (livePlayer?.status === "IN_GAME" || (livePlayer?.game && livePlayer.game.status === "ACTIVE")) {
       router.push("/game");
       return;
     }
