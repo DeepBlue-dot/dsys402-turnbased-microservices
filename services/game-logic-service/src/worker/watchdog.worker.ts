@@ -1,6 +1,7 @@
 import { redis } from "../config/redis.js";
 import { gameService } from "../services/game.service.js";
 import { config } from "../config/env.js";
+import { publishEvent } from "../services/rabbitmq.service.js";
 
 const TIMERS_KEY = "game:timers";
 
@@ -15,8 +16,6 @@ export const startWatchdog = () => {
       // We look for scores between 0 and 'now'
       const expiredMatchIds = await redis.zrangebyscore(TIMERS_KEY, 0, now, "LIMIT", 0, 10);
 
-      if (expiredMatchIds.length === 0) return;
-
       for (const matchId of expiredMatchIds) {
         // 2. ATOMIC CLAIM: Try to remove the matchId from the timer set
         // If zrem returns 1, this specific server instance "won" the right to handle the timeout.
@@ -26,6 +25,18 @@ export const startWatchdog = () => {
         if (claimed === 1) {
           console.log(`[Watchdog] Match ${matchId} timed out. Processing forfeit...`);
           await handleTimeout(matchId);
+        }
+      }
+
+      // 3. Find rematches that have passed their deadline
+      const expiredRematchIds = await redis.zrangebyscore("rematch:timers", 0, now, "LIMIT", 0, 10);
+
+      for (const matchId of expiredRematchIds) {
+        const claimed = await redis.zrem("rematch:timers", matchId);
+
+        if (claimed === 1) {
+          console.log(`[Watchdog] Rematch for match ${matchId} timed out. Expiring request...`);
+          await handleRematchTimeout(matchId);
         }
       }
     } catch (err) {
@@ -48,4 +59,31 @@ async function handleTimeout(matchId: string) {
 
   // Archive the game as a TIMEOUT
   await gameService.endGame(matchId, board, winnerId, "TIMEOUT");
+}
+
+/**
+ * Handle rematch request expiration
+ */
+async function handleRematchTimeout(matchId: string) {
+  const key = `game:rematch:${matchId}`;
+  const rematch = await redis.hgetall(key);
+  if (!rematch || Object.keys(rematch).length === 0) return;
+
+  const players: string[] = JSON.parse(rematch.players);
+
+  // Delete from Redis
+  await redis.del(key);
+
+  const locations = await Promise.all(
+    players.map((id) => gameService.getPlayerLocation(id))
+  );
+
+  for (const loc of locations) {
+    if (loc) {
+      await publishEvent(`game.event.rematch_expired.${loc.instanceId}`, {
+        recipientId: loc.userId,
+        matchId,
+      });
+    }
+  }
 }

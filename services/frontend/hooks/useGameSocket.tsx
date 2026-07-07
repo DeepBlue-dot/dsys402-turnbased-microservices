@@ -46,6 +46,13 @@ type GameSocketContextValue = {
   notice: string | null;
   clearNotice: () => void;
   sendChatMessage: (text: string) => boolean;
+  rematchState: {
+    matchId: string;
+    status: "idle" | "pending" | "accepted" | "expired";
+    requestedBy: string;
+  } | null;
+  requestRematch: (matchId: string) => boolean;
+  declineRematch: (matchId: string) => boolean;
 };
 
 const GameSocketContext = createContext<GameSocketContextValue | null>(null);
@@ -73,6 +80,9 @@ export function GameSocketProvider({ children }: { children: ReactNode }) {
     notice: socketState.notice,
     clearNotice: socketState.clearNotice,
     sendChatMessage: socketState.sendChatMessage,
+    rematchState: socketState.rematchState,
+    requestRematch: socketState.requestRematch,
+    declineRematch: socketState.declineRematch,
   }), [socketState]);
 
   return (

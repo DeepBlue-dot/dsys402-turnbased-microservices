@@ -52,15 +52,24 @@ export const gatewayService = {
     await publishEvent("game.cmd.draw_decline", { userId, matchId });
   },
 
+  async handleRematchRequest(userId: string, matchId: string) {
+    await publishEvent("game.cmd.rematch_request", { userId, matchId });
+  },
+
+  async handleRematchDecline(userId: string, matchId: string) {
+    await publishEvent("game.cmd.rematch_decline", { userId, matchId });
+  },
+
   async handleSyncRequest(userId: string) {
     const presenceKey = `presence:${userId}`;
 
     // 1. Fetch presence and match mapping in parallel
-    const [presence, matchId, queueRank, joinTime] = await Promise.all([
+    const [presence, matchId, queueRank, joinTime, lastMatchId] = await Promise.all([
       redis.hgetall(presenceKey),
       redis.get(`player:match_map:${userId}`), // Direct index lookup
       redis.zrank(QUEUE_KEY, userId),
       redis.hget(JOIN_TIMES_KEY, userId),
+      redis.get(`player:last_match:${userId}`),
     ]);
 
     if (!presence || Object.keys(presence).length === 0) {
@@ -114,6 +123,20 @@ export const gatewayService = {
         await redis.del(`player:match_map:${userId}`);
         await redis.hset(`presence:${userId}`, "status", "IDLE");
         state.status = "IDLE";
+      }
+    }
+
+    // --- Scenario: REMATCH ---
+    if (lastMatchId) {
+      const rematchKey = `game:rematch:${lastMatchId}`;
+      const rematchData = await redis.hgetall(rematchKey);
+      if (rematchData && Object.keys(rematchData).length > 0) {
+        state.rematch = {
+          matchId: lastMatchId,
+          status: rematchData.status,
+          requestedBy: rematchData.requestedBy,
+          players: JSON.parse(rematchData.players || "[]"),
+        };
       }
     }
 

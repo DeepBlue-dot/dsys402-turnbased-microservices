@@ -75,6 +75,12 @@ export type CurrentPlayerState = {
   lastOnline?: string | null;
   queue?: QueueState;
   game?: ActiveGameState;
+  rematch?: {
+    matchId: string;
+    status: "idle" | "pending" | "accepted";
+    requestedBy: string;
+    players: string[];
+  };
 };
 
 export type PlayerSearchItem = {
@@ -326,7 +332,25 @@ export type GameSocketMessage =
   | ErrorMessage
   | GameDrawProposedMessage
   | GameDrawDeclinedMessage
-  | PlayerRatingUpdatedMessage;
+  | PlayerRatingUpdatedMessage
+  | {
+      type: "REMATCH_STATUS";
+      data: {
+        recipientId: string;
+        matchId: string;
+        requestedBy: string;
+        status: "idle" | "pending" | "accepted";
+      };
+      timestamp?: string;
+    }
+  | {
+      type: "REMATCH_EXPIRED";
+      data: {
+        recipientId: string;
+        matchId: string;
+      };
+      timestamp?: string;
+    };
 
 export type OutgoingSocketMessage =
   | {
@@ -371,6 +395,18 @@ export type OutgoingSocketMessage =
       to: string;
       matchId: string;
       text: string;
+    }
+  | {
+      type: "REMATCH_REQUEST";
+      payload: {
+        matchId: string;
+      };
+    }
+  | {
+      type: "REMATCH_DECLINE";
+      payload: {
+        matchId: string;
+      };
     };
 
 export type FeedItem = {

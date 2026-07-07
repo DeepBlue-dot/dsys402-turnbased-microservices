@@ -53,6 +53,14 @@ export const handleEvents = async (event: {
       await handlePlayerRatingUpdated(event.data);
       break;
 
+    case "game.event.rematch_status":
+      await handleRematchStatus(event.data);
+      break;
+
+    case "game.event.rematch_expired":
+      await handleRematchExpired(event.data);
+      break;
+
     case "matchmaking.joined":
       sendToUser(event.data.userId, { type: "QUEUE_JOINED", data: event.data });
       break;
@@ -128,6 +136,28 @@ const handlePlayerRatingUpdated = async (payload: {
 }) => {
   sendToUser(payload.recipientId, {
     type: "PLAYER_RATING_UPDATED",
+    data: payload,
+  });
+};
+
+const handleRematchStatus = async (payload: {
+  recipientId: string;
+  matchId: string;
+  requestedBy: string;
+  status: "idle" | "pending" | "accepted";
+}) => {
+  sendToUser(payload.recipientId, {
+    type: "REMATCH_STATUS",
+    data: payload,
+  });
+};
+
+const handleRematchExpired = async (payload: {
+  recipientId: string;
+  matchId: string;
+}) => {
+  sendToUser(payload.recipientId, {
+    type: "REMATCH_EXPIRED",
     data: payload,
   });
 };

@@ -3,6 +3,7 @@ import { MatchHistory } from "../models/MatchHistory.model.js";
 import { ticTacToeEngine, Board } from "../engine/tic-tac-toe.engine.js";
 import { publishEvent } from "./rabbitmq.service.js";
 import { config } from "../config/env.js";
+import { v4 as uuidv4 } from "uuid";
 
 const TIMERS_KEY = "game:timers";
 const PRESENCE_PREFIX = "presence:";
@@ -227,8 +228,15 @@ export const gameService = {
       pipeline.del(`player:match_map:${pid}`);
       pipeline.hset(`${PRESENCE_PREFIX}${pid}`, { status: "IDLE" });
       pipeline.hdel(`${PRESENCE_PREFIX}${pid}`, "matchId");
+      pipeline.set(`player:last_match:${pid}`, matchId, "EX", 60);
     }
     pipeline.del(`game:match:${matchId}`).zrem(TIMERS_KEY, matchId);
+    pipeline.hset(`game:rematch:${matchId}`, {
+      players: JSON.stringify(players),
+      status: "idle",
+      requestedBy: "",
+    });
+    pipeline.expire(`game:rematch:${matchId}`, 60);
     await pipeline.exec();
 
     for (const loc of locations) {
@@ -357,6 +365,112 @@ export const gameService = {
     for (const loc of locations) {
       if (loc) {
         await publishEvent(`game.event.draw_declined.${loc.instanceId}`, {
+          recipientId: loc.userId,
+          matchId,
+        });
+      }
+    }
+  },
+
+  /* ───────────────────────── REMATCH ───────────────────────── */
+
+  async handleRematchRequest(matchId: string, userId: string) {
+    const key = `game:rematch:${matchId}`;
+    const rematch = await redis.hgetall(key);
+    if (!rematch || Object.keys(rematch).length === 0) return;
+
+    const players: string[] = JSON.parse(rematch.players);
+    if (!players.includes(userId)) return;
+
+    const currentStatus = rematch.status;
+    const requestedBy = rematch.requestedBy;
+
+    if (currentStatus === "idle") {
+      // Transition to pending
+      await redis.pipeline()
+        .hset(key, { status: "pending", requestedBy: userId })
+        .zadd("rematch:timers", Date.now() + 30000, matchId)
+        .exec();
+
+      const locations = await Promise.all(
+        players.map((id) => this.getPlayerLocation(id))
+      );
+
+      for (const loc of locations) {
+        if (loc) {
+          await publishEvent(`game.event.rematch_status.${loc.instanceId}`, {
+            recipientId: loc.userId,
+            matchId,
+            status: "pending",
+            requestedBy: userId,
+          });
+        }
+      }
+    } else if (currentStatus === "pending") {
+      if (requestedBy !== userId) {
+        // Both players agreed -> REMATCH ACCEPTED!
+        // Delete rematch record and timer
+        await redis.pipeline()
+          .del(key)
+          .zrem("rematch:timers", matchId)
+          .exec();
+
+        const newMatchId = uuidv4();
+
+        // Target each player's instance for match.created
+        const locations = await Promise.all(
+          players.map((id) => this.getPlayerLocation(id))
+        );
+
+        const instance1 = locations[0]?.instanceId;
+        const instance2 = locations[1]?.instanceId;
+
+        if (instance1) {
+          await publishEvent(`match.created.${instance1}`, {
+            matchId: newMatchId,
+            players,
+            mode: "ranked",
+          });
+        }
+        if (instance2 && instance2 !== instance1) {
+          await publishEvent(`match.created.${instance2}`, {
+            matchId: newMatchId,
+            players,
+            mode: "ranked",
+          });
+        }
+
+        // Publish global match.created to trigger game initialization and player-service updates
+        await publishEvent(`match.created`, {
+          matchId: newMatchId,
+          players,
+          mode: "ranked",
+        });
+      }
+    }
+  },
+
+  async handleRematchDecline(matchId: string, userId: string) {
+    const key = `game:rematch:${matchId}`;
+    const rematch = await redis.hgetall(key);
+    if (!rematch || Object.keys(rematch).length === 0) return;
+
+    const players: string[] = JSON.parse(rematch.players);
+    if (!players.includes(userId)) return;
+
+    // Explicit decline: delete record, clean up timer, and notify both players
+    await redis.pipeline()
+      .del(key)
+      .zrem("rematch:timers", matchId)
+      .exec();
+
+    const locations = await Promise.all(
+      players.map((id) => this.getPlayerLocation(id))
+    );
+
+    for (const loc of locations) {
+      if (loc) {
+        await publishEvent(`game.event.rematch_expired.${loc.instanceId}`, {
           recipientId: loc.userId,
           matchId,
         });

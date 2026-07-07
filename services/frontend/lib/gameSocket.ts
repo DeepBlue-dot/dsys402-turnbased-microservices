@@ -54,6 +54,13 @@ export type GameSocketControllerValue = {
   notice: string | null;
   clearNotice: () => void;
   sendChatMessage: (text: string) => boolean;
+  rematchState: {
+    matchId: string;
+    status: "idle" | "pending" | "accepted" | "expired";
+    requestedBy: string;
+  } | null;
+  requestRematch: (matchId: string) => boolean;
+  declineRematch: (matchId: string) => boolean;
 };
 
 export function useGameSocketController(userId?: string): GameSocketControllerValue {
@@ -81,6 +88,11 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
     newRating: number;
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [rematchState, setRematchState] = useState<{
+    matchId: string;
+    status: "idle" | "pending" | "accepted" | "expired";
+    requestedBy: string;
+  } | null>(null);
 
   const liveGameRef = useRef<ActiveGameState | null>(null);
   useEffect(() => {
@@ -203,6 +215,11 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
               setRatingUpdate(null);
             }
           }
+          if (data.rematch !== undefined) {
+            setRematchState(data.rematch);
+          } else {
+            setRematchState(null);
+          }
           break;
         }
         case "QUEUE_JOINED": {
@@ -224,6 +241,7 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
           setLiveQueue(null);
           setGameOverState(null);
           setRatingUpdate(null);
+          setRematchState(null);
           setChat([]);
           setLiveGame({
             matchId: message.data.matchId,
@@ -254,6 +272,7 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
           setLiveQueue(null);
           setGameOverState(null);
           setRatingUpdate(null);
+          setRematchState(null);
           setChat([]);
           setLiveGame({
             matchId: message.data.matchId,
@@ -378,6 +397,27 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
           if (liveGameRef.current?.matchId === message.data.matchId) {
             setRatingUpdate(message.data);
           }
+          break;
+        }
+        case "REMATCH_STATUS": {
+          setRematchState(message.data);
+          const isFromMe = message.data.requestedBy === userId;
+          addFeedItem(
+            "Rematch status",
+            isFromMe ? "You requested a rematch." : "Opponent requested a rematch."
+          );
+          break;
+        }
+        case "REMATCH_EXPIRED": {
+          setRematchState((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              status: "expired",
+            };
+          });
+          setNotice("Rematch request expired");
+          addFeedItem("Rematch expired", "The rematch offer has expired or was declined.");
           break;
         }
         case "chat.status": {
@@ -505,6 +545,20 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
     };
   }, [disconnect]);
 
+  const requestRematch = useCallback((matchId: string) => {
+    return send({
+      type: "REMATCH_REQUEST",
+      payload: { matchId },
+    });
+  }, [send]);
+
+  const declineRematch = useCallback((matchId: string) => {
+    return send({
+      type: "REMATCH_DECLINE",
+      payload: { matchId },
+    });
+  }, [send]);
+
   return useMemo<GameSocketControllerValue>(() => ({
     connect,
     connectionState,
@@ -524,6 +578,9 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
     notice,
     clearNotice,
     sendChatMessage,
+    rematchState,
+    requestRematch,
+    declineRematch,
   }), [
     chat,
     clearNotice,
@@ -542,5 +599,8 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
     send,
     sendChatMessage,
     sync,
+    rematchState,
+    requestRematch,
+    declineRematch,
   ]);
 }

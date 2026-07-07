@@ -30,6 +30,19 @@ const calculateElo = (winnerRating: number, loserRating: number) => {
   };
 };
 
+const calculateDrawElo = (p1Rating: number, p2Rating: number) => {
+  const K = 32;
+  const expectedP1 =
+    1 / (1 + Math.pow(10, (p2Rating - p1Rating) / 400));
+  const expectedP2 =
+    1 / (1 + Math.pow(10, (p1Rating - p2Rating) / 400));
+
+  return {
+    p1NewRating: Math.round(p1Rating + K * (0.5 - expectedP1)),
+    p2NewRating: Math.round(p2Rating + K * (0.5 - expectedP2)),
+  };
+};
+
 /**
  * Main Event Discriminator
  */
@@ -193,16 +206,23 @@ const handleMatchEnded = async (payload: MatchEndedPayload) => {
           p2OldRating: p2Stats.rating,
         };
       } else {
-        // Draw: increment draws for all players
-        await tx.playerStats.updateMany({
-          where: { playerId: { in: players } },
-          data: { draws: { increment: 1 } },
-        });
+        const ratings = calculateDrawElo(p1Stats.rating, p2Stats.rating);
+
+        await Promise.all([
+          tx.playerStats.update({
+            where: { playerId: p1Id },
+            data: { draws: { increment: 1 }, rating: ratings.p1NewRating },
+          }),
+          tx.playerStats.update({
+            where: { playerId: p2Id },
+            data: { draws: { increment: 1 }, rating: ratings.p2NewRating },
+          }),
+        ]);
 
         return {
-          p1NewRating: p1Stats.rating,
+          p1NewRating: ratings.p1NewRating,
           p1OldRating: p1Stats.rating,
-          p2NewRating: p2Stats.rating,
+          p2NewRating: ratings.p2NewRating,
           p2OldRating: p2Stats.rating,
         };
       }

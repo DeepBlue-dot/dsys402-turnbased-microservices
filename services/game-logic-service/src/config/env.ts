@@ -48,6 +48,8 @@ export const config = {
     "game.cmd.draw_propose",
     "game.cmd.draw_confirm",
     "game.cmd.draw_decline",
+    "game.cmd.rematch_request",
+    "game.cmd.rematch_decline",
   ],
 
   // 🛡️ Security

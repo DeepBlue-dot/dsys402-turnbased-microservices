@@ -181,6 +181,7 @@ function PlayerPanel({
 
 export default function GamePage() {
   const router = useRouter();
+  const { loading, player, user } = useAuth();
   const {
     connectionState,
     error: socketError,
@@ -195,6 +196,9 @@ export default function GamePage() {
     ratingUpdate,
     notice,
     sendChatMessage,
+    rematchState,
+    requestRematch,
+    declineRematch,
   } = useGameSocket(!!user);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [chatText, setChatText] = useState("");
@@ -638,21 +642,33 @@ export default function GamePage() {
                       {socketError}
                     </div>
                   )}
-                  <div className="w-full grid gap-2">
-                    <Button onClick={() => router.push("/matchmaking")} className="w-full bg-primary hover:bg-primary/95 text-primary-foreground font-bold tracking-wide shadow-md shadow-primary/20 transition-all duration-200">
+                  <div className="w-full grid gap-2.5">
+                    <Button
+                      onClick={() => router.push("/matchmaking")}
+                      className="w-full min-h-11 rounded-xl bg-primary px-4 py-3 font-semibold tracking-wide text-primary-foreground shadow-md shadow-primary/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/95 active:scale-[0.98]"
+                    >
                       <Play className="mr-2 h-4 w-4 fill-current" aria-hidden="true" />
                       Find Match
                     </Button>
-                    <Button variant="outline" onClick={() => sync()} disabled={!isConnected} className="w-full border-border/80 bg-muted/30 hover:bg-muted/50 font-bold transition-all duration-200">
+                    <Button
+                      variant="outline"
+                      onClick={() => sync()}
+                      disabled={!isConnected}
+                      className="w-full min-h-11 rounded-xl border-border/80 bg-muted/30 px-4 py-3 font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60 active:scale-[0.98]"
+                    >
                       <RefreshCcw className="mr-2 h-4 w-4" aria-hidden="true" />
                       Sync State
                     </Button>
-                    <Button variant="ghost" onClick={() => router.push("/dashboard")} className="w-full text-muted-foreground hover:text-foreground font-bold transition-all duration-200">
+                    <Button
+                      variant="ghost"
+                      onClick={() => router.push("/dashboard")}
+                      className="w-full min-h-11 rounded-xl px-4 py-3 font-semibold text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-muted/50 hover:text-foreground active:scale-[0.98]"
+                    >
                       Go to Dashboard
                     </Button>
                   </div>
                 </>
-              ) : (
+              ) : gameOver ? (
                 // Case: Game Over
                 <>
                   <div className="mx-auto animate-in zoom-in duration-300">
@@ -719,20 +735,78 @@ export default function GamePage() {
                     )}
                   </div>
 
-                  <div className="w-full grid gap-2">
-                    <Button onClick={() => router.push("/matchmaking")} className="w-full bg-primary hover:bg-primary/95 text-primary-foreground font-bold tracking-wide shadow-md shadow-primary/20 transition-all duration-200">
+                  {/* Rematch Offer Section */}
+                  {game && (
+                    <div className="w-full border border-border bg-muted/20 rounded-2xl p-4 flex flex-col gap-3">
+                      <p className="text-xs font-semibold text-muted-foreground select-none">Rematch Offer</p>
+                      {(!rematchState || rematchState.status === "idle") ? (
+                        <Button
+                          onClick={() => requestRematch(game.matchId)}
+                          disabled={!isConnected}
+                          className="w-full min-h-10 rounded-xl bg-accent px-4 py-2 font-semibold text-accent-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-accent/90"
+                        >
+                          <RefreshCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+                          Request Rematch
+                        </Button>
+                      ) : rematchState.status === "pending" ? (
+                        rematchState.requestedBy === user?.id ? (
+                          <Button
+                            disabled
+                            className="w-full min-h-10 rounded-xl bg-muted px-4 py-2 font-semibold text-muted-foreground cursor-not-allowed"
+                          >
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                            Waiting for opponent...
+                          </Button>
+                        ) : (
+                          <div className="flex gap-2 w-full">
+                            <Button
+                              onClick={() => requestRematch(game.matchId)}
+                              className="flex-1 min-h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-all duration-200 hover:-translate-y-0.5"
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => declineRematch(game.matchId)}
+                              className="flex-1 min-h-10 rounded-xl border-destructive text-destructive hover:bg-destructive/10 font-semibold transition-all duration-200 hover:-translate-y-0.5"
+                            >
+                              Decline
+                            </Button>
+                          </div>
+                        )
+                      ) : rematchState.status === "expired" ? (
+                        <p className="text-sm font-medium text-destructive">
+                          Rematch request expired or declined
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+
+                  <div className="w-full grid gap-2.5">
+                    <Button
+                      onClick={() => router.push("/matchmaking")}
+                      className="w-full min-h-11 rounded-xl bg-primary px-4 py-3 font-semibold tracking-wide text-primary-foreground shadow-md shadow-primary/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/95 active:scale-[0.98]"
+                    >
                       Next Match
                     </Button>
-                    <Button variant="outline" onClick={() => router.push(`/history/${game.matchId}`)} className="w-full border-border/80 bg-muted/30 hover:bg-muted/50 font-bold transition-all duration-200">
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push(`/history/${game.matchId}`)}
+                      className="w-full min-h-11 rounded-xl border-border/80 bg-muted/30 px-4 py-3 font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:bg-muted/50 active:scale-[0.98]"
+                    >
                       <History className="mr-2 h-4 w-4" aria-hidden="true" />
                       View Match Details
                     </Button>
-                    <Button variant="ghost" onClick={() => router.push("/dashboard")} className="w-full text-muted-foreground hover:text-foreground font-bold transition-all duration-200">
+                    <Button
+                      variant="ghost"
+                      onClick={() => router.push("/dashboard")}
+                      className="w-full min-h-11 rounded-xl px-4 py-3 font-semibold text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-muted/50 hover:text-foreground active:scale-[0.98]"
+                    >
                       Back to Dashboard
                     </Button>
                   </div>
                 </>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         </div>

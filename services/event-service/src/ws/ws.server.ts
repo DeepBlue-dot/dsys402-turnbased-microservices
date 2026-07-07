@@ -98,6 +98,16 @@ export const startWSServer = (server: http.Server) => {
               success=true;
               break;
 
+            case "REMATCH_REQUEST":
+              await gatewayService.handleRematchRequest(userId, payload.matchId);
+              success=true;
+              break;
+
+            case "REMATCH_DECLINE":
+              await gatewayService.handleRematchDecline(userId, payload.matchId);
+              success=true;
+              break;
+
             case "SYNC_REQUEST":
               const currentState =
                 await gatewayService.handleSyncRequest(userId);

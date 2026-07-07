@@ -40,6 +40,9 @@ coverage/
 temp/
 k8s/
 
+.postman/
+postman/
+
 ##############################
 # IDE / Editor Files
 ##############################

@@ -29,6 +29,14 @@ export const handleEvents = async (event: Event) => {
       await gameService.handleDrawDecline(data.matchId, data.userId);
       break;
 
+    case "game.cmd.rematch_request":
+      await gameService.handleRematchRequest(data.matchId, data.userId);
+      break;
+
+    case "game.cmd.rematch_decline":
+      await gameService.handleRematchDecline(data.matchId, data.userId);
+      break;
+
     case "player.disconnected":
       await gameService.handlePlayerDisconnect(data.userId);
       break;
