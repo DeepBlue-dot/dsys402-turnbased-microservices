@@ -16,6 +16,11 @@ export function RematchToast() {
   const [matchId, setMatchId] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
 
+  function initials(id: string | null) {
+    if (!id) return "?";
+    return id.slice(0, 2).toUpperCase();
+  }
+
   useEffect(() => {
     if (!rematchState || rematchState.status !== "pending") {
       setVisible(false);
@@ -68,19 +73,21 @@ export function RematchToast() {
   if (!visible || !matchId || !rematchState) return null;
 
   return (
-    <div className="fixed right-4 top-20 z-50">
-      <Card className="w-80 bg-white border border-border shadow-lg rounded-lg">
-        <CardContent className="p-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-sm font-semibold">Rematch Offer</div>
-              <div className="text-xs text-muted-foreground mt-1">Your opponent requested a rematch.</div>
+    <div className="fixed right-4 top-20 z-50" role="status" aria-live="polite">
+      <Card className="w-80 bg-card/80 border border-border shadow-lg rounded-lg overflow-hidden">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-foreground">Rematch Offer</div>
+              <div className="text-sm text-muted-foreground mt-1">Opponent requested a rematch.</div>
             </div>
-            <div className="text-xs text-muted-foreground">Incoming</div>
           </div>
-          <div className="flex gap-2 mt-3">
+
+          <div className="flex gap-3 mt-4">
             <Button
-              className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700"
+              variant="default"
+              className="flex-1"
               onClick={() => {
                 requestRematch(matchId);
                 setVisible(false);
@@ -95,8 +102,13 @@ export function RematchToast() {
             </Button>
             <Button
               variant="outline"
-              className="flex-1 border-destructive text-destructive"
+              className="flex-1"
               onClick={() => {
+                try {
+                  sessionStorage.setItem(`dismissedOverlay:${matchId}`, "1");
+                } catch (err) {
+                  /* ignore */
+                }
                 declineRematch(matchId);
                 setVisible(false);
                 setMatchId(null);

@@ -23,6 +23,7 @@ export function PlayerPanel({
   rating,
   symbol,
   avatarUrl,
+  isActive = false,
 }: {
   align?: "left" | "right";
   label: string;
@@ -34,10 +35,14 @@ export function PlayerPanel({
   symbol: GameSymbol;
   supporting: string;
   avatarUrl?: string | null;
+  isActive?: boolean;
 }) {
   return (
     <div className={cn(
-      "rounded-md border border-border bg-card p-3",
+      "rounded-xl border p-3 transition-all duration-200",
+      isActive
+        ? "border-primary/50 bg-primary/[0.08] shadow-[0_0_0_1px_rgba(34,211,238,0.15),0_0_24px_rgba(34,211,238,0.12)]"
+        : "border-border bg-card",
       align === "right" && "text-right",
     )}>
       <div className={cn(

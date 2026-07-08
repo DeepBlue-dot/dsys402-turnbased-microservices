@@ -75,7 +75,6 @@ export default function Home() {
                     <span className="text-sm font-semibold">/ws</span>
                   </div>
                   <div className="flex items-center justify-between rounded-xl bg-muted/70 px-3 py-2">
-                    <span className="text-sm">Turn timer</span>
                     <span className="text-sm font-semibold">Live</span>
                   </div>
                 </div>

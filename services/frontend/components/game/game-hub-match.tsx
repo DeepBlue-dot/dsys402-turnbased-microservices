@@ -241,7 +241,6 @@ export function GameHubMatch({
             </div>
             <div>
               <h2 className="text-3xl font-bold">Tic Tac Toe</h2>
-              <p className="text-muted-foreground">{statusText}. {actionHint}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -313,7 +312,6 @@ export function GameHubMatch({
             avatarUrl={player?.profile?.avatarUrl}
           />
           <div className="rounded-md border border-border bg-card p-3 text-center">
-            <p className="text-xs uppercase text-muted-foreground">Turn timer</p>
             <p className="mt-1 flex items-center justify-center gap-2 font-mono text-3xl font-bold">
               <Clock3 className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
               {countdown === null ? "--" : `${countdown}s`}

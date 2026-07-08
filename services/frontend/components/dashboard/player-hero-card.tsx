@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Award, Flame, ShieldAlert, Trophy, Zap } from "lucide-react";
+import { Award, Flame, ShieldAlert, Trophy, Zap, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getAvatarUrl } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -11,9 +12,10 @@ interface PlayerHeroCardProps {
   livePlayer: any;
   streak: number;
   streakType: "win" | "loss" | "none";
+  onFindMatch?: () => void;
 }
 
-export function PlayerHeroCard({ user, livePlayer, streak, streakType }: PlayerHeroCardProps) {
+export function PlayerHeroCard({ user, livePlayer, streak, streakType, onFindMatch }: PlayerHeroCardProps) {
   const router = useRouter();
   const status = livePlayer.status || "IDLE";
   
@@ -126,25 +128,26 @@ export function PlayerHeroCard({ user, livePlayer, streak, streakType }: PlayerH
 
         {/* Right Side: ELO Rating, Stats, Streak */}
         <div className="flex flex-wrap gap-4 items-center">
-          {/* ELO Card */}
-          <div className="rounded-xl border border-border/80 bg-muted/30 px-4 py-3 min-w-28 text-center shadow-inner">
-            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1 flex items-center justify-center gap-1">
-              <Trophy className="h-3 w-3 text-amber-400" />
-              Rating
-            </p>
-            <p className="font-mono text-2xl font-black text-foreground">{rating}</p>
+          {/* Find Match button (dashboard hero) */}
+          <div>
+            <Button
+              size="lg"
+              onClick={() => {
+                try {
+                  onFindMatch?.();
+                } catch (err) {
+                  // ignore
+                }
+              }}
+              className="relative overflow-hidden rounded-xl py-3 px-4 font-black tracking-wider text-sm shadow-md shadow-primary/20 transition-all duration-300 hover:-translate-y-0.5 bg-primary text-primary-foreground"
+            >
+              <Play className="h-4 w-4 mr-2 fill-current" />
+              FIND MATCH
+            </Button>
           </div>
+          {/* ELO Card */}
 
           {/* Win Rate Card */}
-          <div className="rounded-xl border border-border/80 bg-muted/30 px-4 py-3 min-w-28 text-center shadow-inner">
-            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1 flex items-center justify-center gap-1">
-              <Award className="h-3 w-3 text-emerald-400" />
-              Win Rate
-            </p>
-            <p className="font-mono text-2xl font-black text-foreground">
-              {winRate}%
-            </p>
-          </div>
 
           {/* Streak Badge */}
           {streakType !== "none" && streak > 0 && (

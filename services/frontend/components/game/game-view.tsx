@@ -149,22 +149,6 @@ export function GameView({ onBackToHub }: { onBackToHub?: () => void }) {
         ? "Opponent"
       : "Waiting";
 
-  const statusText = gameOver
-    ? `Game over: ${gameOver.result.toLowerCase()}`
-    : isMyTurn
-      ? "Your turn"
-      : game
-        ? "Waiting for opponent"
-        : "No active match";
-
-  const actionHint = !isConnected
-    ? "Reconnect to send moves."
-    : gameOver
-      ? "The match has ended."
-      : isMyTurn
-        ? "Choose an empty cell."
-        : "Opponent is thinking.";
-
   function makeMove(position: number) {
     if (!game || !isMyTurn || board[position] || gameOver) return;
 
@@ -260,8 +244,8 @@ export function GameView({ onBackToHub }: { onBackToHub?: () => void }) {
   return (
     <div className="mx-auto grid min-h-[calc(100vh-10rem)] w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_340px] animate-in fade-in duration-300">
       <section className="flex min-w-0 flex-col justify-center gap-5">
-        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card/40 p-4 sm:flex-row sm:items-center sm:justify-between backdrop-blur-xl">
-          <div className="space-y-2">
+        <div className="flex flex-col gap-6 rounded-2xl border border-border bg-card/40 p-4 sm:flex-row sm:items-center sm:justify-between backdrop-blur-xl">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className={cn(
                 "inline-flex items-center gap-2 rounded-md border px-2 py-1 font-mono text-xs font-semibold",
@@ -277,9 +261,8 @@ export function GameView({ onBackToHub }: { onBackToHub?: () => void }) {
                 Match {game ? shortId(game.matchId) : "None"}
               </span>
             </div>
-            <div>
+            <div className="pt-1">
               <h1 className="text-3xl font-bold font-black tracking-tight">Tic Tac Toe</h1>
-              <p className="text-xs text-muted-foreground">{statusText}. {actionHint}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -355,6 +338,7 @@ export function GameView({ onBackToHub }: { onBackToHub?: () => void }) {
             symbol={game?.mySymbol || "X"}
             supporting={player?.profile?.bio || "Ready in this match"}
             avatarUrl={player?.profile?.avatarUrl}
+            isActive={!!game && !gameOver && isMyTurn}
           />
           <div className="rounded-xl border border-border bg-card/45 p-3 text-center backdrop-blur-xl shadow-md flex flex-col justify-center items-center">
             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">Turn timer</p>
@@ -375,6 +359,7 @@ export function GameView({ onBackToHub }: { onBackToHub?: () => void }) {
             symbol={opponentSymbol}
             supporting={opponentInfo?.bio || formatLastOnline(opponentInfo?.lastOnline)}
             avatarUrl={opponentInfo?.avatarUrl}
+            isActive={!!game && !gameOver && !isMyTurn && !!game.turn && game.turn === opponentId}
           />
         </div>
 

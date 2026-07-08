@@ -88,8 +88,14 @@ export function RecentMatches({ history, usernames }: RecentMatchesProps) {
       </div>
 
       {/* Matches List */}
-      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-        {filteredHistory.length === 0 ? (
+      <div className="space-y-3 max-h-105 overflow-y-auto pr-1 
+        [&::-webkit-scrollbar]:w-1.5
+        [&::-webkit-scrollbar-track]:bg-transparent
+        [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20
+        [&::-webkit-scrollbar-thumb]:rounded-full
+        hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40"
+      >        
+      {filteredHistory.length === 0 ? (
           <div className="text-center py-10 space-y-2">
             <Swords className="h-8 w-8 text-muted-foreground/30 mx-auto" />
             <p className="text-xs text-muted-foreground">No matches found matching the filter.</p>

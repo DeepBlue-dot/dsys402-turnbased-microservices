@@ -13,7 +13,6 @@ import type {
 import { PlayerHeroCard } from "@/components/dashboard/player-hero-card";
 import { LeaderboardPeek } from "@/components/dashboard/leaderboard-peek";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
-import { LiveState } from "@/components/dashboard/live-state";
 import { RecentMatches } from "@/components/dashboard/recent-matches";
 import { MatchmakingView } from "@/components/matchmaking/matchmaking-view";
 import { GameView } from "@/components/game/game-view";
@@ -23,7 +22,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const { loading, logout, player, refreshUser, user } = useAuth();
   const {
-    connectionState,
     isConnected,
     sync,
     liveStatus,
@@ -252,6 +250,7 @@ export default function DashboardPage() {
         livePlayer={livePlayer}
         streak={streak}
         streakType={streakType}
+        onFindMatch={handleFindMatch}
       />
 
       {actionError && (
@@ -263,27 +262,10 @@ export default function DashboardPage() {
       {/* Progression & Stats Grid */}
       <DashboardStats stats={stats} winRate={winRate} history={history} />
 
-      {/* Primary Interaction Split Layout */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
-        {/* Left Column: Action Zone / Gateway */}
-        <div className="space-y-6">
-          <LiveState
-            connectionState={connectionState}
-            isConnected={isConnected}
-            livePlayer={livePlayer}
-            liveOpponentUsername={liveOpponentUsername}
-            sync={sync}
-            onFindMatch={handleFindMatch}
-            handleLeaveQueue={handleLeaveQueue}
-            logout={() => void logout()}
-          />
-        </div>
-
-        {/* Right Column: Social Leaderboard & Match History */}
-        <div className="space-y-6">
-          <LeaderboardPeek players={leaderboard} currentUserId={user.id} />
-          <RecentMatches history={history} usernames={usernames} />
-        </div>
+      {/* Social & Match History */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <LeaderboardPeek players={leaderboard} currentUserId={user.id} />
+        <RecentMatches history={history} usernames={usernames} />
       </div>
     </div>
     {showOverlay && (
