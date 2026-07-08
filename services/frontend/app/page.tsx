@@ -24,8 +24,8 @@ const highlights = [
 export default function Home() {
   return (
     <div className="grid min-h-[calc(100vh-10rem)] content-center gap-8 py-8">
-      <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-gradient-to-br from-background via-background to-primary/10 shadow-[0_20px_80px_-30px_hsl(var(--primary))]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.18),_transparent_45%)]" />
+      <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-linear-to-br from-background via-background to-primary/10 shadow-[0_20px_80px_-30px_hsl(var(--primary))]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_45%)]" />
         <div className="relative grid gap-8 px-6 py-8 sm:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:px-10 lg:py-10">
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm font-medium text-primary">

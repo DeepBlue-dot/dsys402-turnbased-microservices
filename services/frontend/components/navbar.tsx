@@ -23,7 +23,7 @@ export function Navbar() {
     ];
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
             <div className="mx-auto flex h-14 w-full max-w-6xl items-center px-4 sm:px-6 lg:px-8">
                 <div className="mr-4 flex min-w-0 items-center">
                     <Link href="/" className="mr-4 flex items-center gap-2 font-bold">
