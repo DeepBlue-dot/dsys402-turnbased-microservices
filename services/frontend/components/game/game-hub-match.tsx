@@ -151,7 +151,7 @@ export function GameHubMatch({
       ? "The match has ended."
       : isMyTurn
         ? "Choose an empty cell."
-        : "Opponent is thinking.";
+        : "";
 
   function makeMove(position: number) {
     if (!game || !isMyTurn || board[position] || gameOver) return;

@@ -17,6 +17,7 @@ import { LiveState } from "@/components/dashboard/live-state";
 import { RecentMatches } from "@/components/dashboard/recent-matches";
 import { MatchmakingView } from "@/components/matchmaking/matchmaking-view";
 import { GameView } from "@/components/game/game-view";
+import { GameOverlay } from "@/components/game/game-overlay";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -29,12 +30,19 @@ export default function DashboardPage() {
     liveQueue,
     liveGame,
     gameOverState,
+    error: socketError,
+    ratingUpdate,
+    rematchState,
+    requestRematch,
+    declineRematch,
   } = useGameSocket(!!user);
   
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
   const [leaderboard, setLeaderboard] = useState<PlayerSearchItem[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"hub" | "game">("hub");
+  const [showOverlay, setShowOverlay] = useState(false);
+  const [dismissedOverlayForMatch, setDismissedOverlayForMatch] = useState<string | null>(null);
 
   const livePlayer = useMemo<CurrentPlayerState | null>(() => {
     if (!player) return null;
@@ -129,10 +137,27 @@ export default function DashboardPage() {
     const timer = window.setTimeout(() => {
       void refreshDashboardData();
       void refreshUser();
+
+      const matchId = gameOverState.matchId;
+      let dismissed = false;
+
+      if (matchId) {
+        try {
+          dismissed = !!sessionStorage.getItem(`dismissedOverlay:${matchId}`);
+          if (dismissed) setDismissedOverlayForMatch(matchId);
+        } catch (err) {
+          // ignore storage errors
+        }
+      }
+
+      // only auto-show overlay if the user hasn't dismissed it for this match
+      if (matchId && !dismissed) {
+        setShowOverlay(true);
+      }
     }, 150);
 
     return () => window.clearTimeout(timer);
-  }, [gameOverState, refreshDashboardData, refreshUser]);
+  }, [gameOverState, refreshDashboardData, refreshUser, dismissedOverlayForMatch]);
 
   async function handleFindMatch() {
     setActionError(null);
@@ -196,7 +221,10 @@ export default function DashboardPage() {
   }
 
   const hasLiveMatch = status === "IN_GAME" || (!!liveGame && liveGame.status !== "ENDED");
-  const shouldShowGameView = hasLiveMatch || (viewMode === "game" && !!gameOverState);
+  // Show the full GameView when there's a live match or when the user explicitly
+  // navigated to the game view. The post-match overlay is rendered separately
+  // so it can be dismissed without being forced back into the GameView.
+  const shouldShowGameView = hasLiveMatch || viewMode === "game";
 
   if (shouldShowGameView) {
     return (
@@ -216,6 +244,7 @@ export default function DashboardPage() {
   const winRate = totalGames > 0 ? Math.round((stats.wins / totalGames) * 100) : 0;
 
   return (
+    <>
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Player Identity Hero Card */}
       <PlayerHeroCard
@@ -257,5 +286,48 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    {showOverlay && (
+      <GameOverlay
+        game={liveGame || null}
+        gameOver={gameOverState || null}
+        socketError={socketError || null}
+        isConnected={isConnected}
+        sync={sync}
+        ratingUpdate={ratingUpdate || null}
+        rematchState={rematchState || null}
+        requestRematch={requestRematch || (() => false)}
+        declineRematch={declineRematch || (() => false)}
+        user={user}
+        onFindNextMatch={() => void handleFindMatch()}
+        onOpenHistory={() => {
+          const matchId = gameOverState?.matchId || liveGame?.matchId;
+          if (matchId) router.push(`/history/${matchId}`);
+        }}
+        onReturnToHub={() => {
+          const dismissed = gameOverState?.matchId || liveGame?.matchId || null;
+          setShowOverlay(false);
+          setViewMode("hub");
+          setDismissedOverlayForMatch(dismissed);
+          if (dismissed) {
+            try {
+              sessionStorage.setItem(`dismissedOverlay:${dismissed}`, "1");
+            } catch (err) {
+              // ignore storage errors
+            }
+          }
+          void refreshDashboardData();
+          void refreshUser();
+          sync();
+          // ensure the dashboard reflects latest server state after closing overlay
+          try {
+            router.refresh();
+          } catch (err) {
+            // fallback to full reload if router.refresh isn't available
+            if (typeof window !== "undefined") window.location.reload();
+          }
+        }}
+      />
+    )}
+    </>
   );
 }

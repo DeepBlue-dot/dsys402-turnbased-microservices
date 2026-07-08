@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useEffect } from "react";
+import { createContext, useContext, useMemo, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -63,23 +63,33 @@ export function GameSocketProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user } = useAuth();
   const socketState = useGameSocketController(user?.id);
+  const lastHandledRef = useRef<GameSocketMessage | null>(null);
 
   useEffect(() => {
-    const hasActiveMatch =
-      !!user?.id &&
-      !!socketState.liveGame &&
-      socketState.liveGame.status !== "ENDED" &&
-      socketState.liveStatus === "IN_GAME";
+    const lastMessage = socketState.lastMessage;
+    if (!user?.id || !lastMessage) return;
+    if (lastHandledRef.current === lastMessage) return;
+    lastHandledRef.current = lastMessage;
 
-    const shouldRedirectToDashboard =
-      hasActiveMatch &&
-      pathname !== "/dashboard" &&
-      !pathname.startsWith("/dashboard");
+    const event = lastMessage.type;
+    const redirectEvents = new Set([
+      "MATCH_CREATED",
+      "GAME_STARTED",
+      "GAME_TURN",
+      "GAME_DRAW_PROPOSED",
+      "GAME_DRAW_DECLINED",
+      "GAME_OVER",
+      "REMATCH_STATUS",
+      "REMATCH_EXPIRED",
+    ]);
 
-    if (shouldRedirectToDashboard) {
+    if (!redirectEvents.has(event)) return;
+
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : pathname;
+    if (currentPath && !currentPath.startsWith("/dashboard")) {
       router.replace("/dashboard");
     }
-  }, [pathname, router, socketState.liveGame, socketState.liveStatus, user?.id]);
+  }, [socketState.lastMessage, router, socketState.liveGame, user?.id]);
 
   const value = useMemo<GameSocketContextValue>(() => ({
     connect: socketState.connect,

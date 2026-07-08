@@ -7,7 +7,9 @@ import {
   Play,
   RefreshCcw,
   Swords,
+  X,
 } from "lucide-react";
+import type { PointerEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -73,8 +75,23 @@ export function GameOverlay({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-md animate-in fade-in duration-300">
-      <Card className="relative w-full max-w-md overflow-hidden border border-border/80 bg-card/60 backdrop-blur-xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-md animate-in fade-in duration-300"
+      onPointerDown={(e: PointerEvent<HTMLDivElement>) => {
+        if (e.target === e.currentTarget) {
+          handleNavigate(onReturnToHub);
+        }
+      }}
+    >
+        <Card className="relative w-full max-w-md overflow-hidden border border-border/80 bg-card/60 backdrop-blur-xl shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+          <Button
+            variant="ghost"
+            onClick={() => handleNavigate(onReturnToHub)}
+            aria-label="Close"
+            className="absolute right-3 top-3 h-8 w-8 rounded-md p-0 text-muted-foreground"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         {/* Ambient Background Glow */}
         <div className="absolute -right-16 -top-16 h-36 w-36 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
         <div className="absolute -left-16 -bottom-16 h-36 w-36 rounded-full bg-accent/10 blur-2xl pointer-events-none" />
@@ -192,8 +209,7 @@ export function GameOverlay({
 
               {/* Rematch Offer Section */}
               {game && (
-                <div className="w-full border border-border bg-muted/20 rounded-2xl p-4 flex flex-col gap-3">
-                  <p className="text-xs font-semibold text-muted-foreground select-none">Rematch Offer</p>
+                <div className="w-full">
                   {(!rematchState || rematchState.status === "idle") ? (
                     <Button
                       onClick={() => requestRematch(game.matchId)}
@@ -262,13 +278,7 @@ export function GameOverlay({
                   <History className="mr-2 h-4 w-4" aria-hidden="true" />
                   View Match Details
                 </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleNavigate(onReturnToHub)}
-                  className="w-full min-h-11 rounded-xl px-4 py-3 font-semibold text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-muted/50 hover:text-foreground active:scale-[0.98]"
-                >
-                  Back to Dashboard
-                </Button>
+                {/* Close handled by top-right X button */}
               </div>
             </>
           ) : null}

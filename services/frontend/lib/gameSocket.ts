@@ -411,7 +411,6 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
               requestedBy: prev?.requestedBy || "",
             };
           });
-          setNotice("Rematch request expired");
           break;
         }
         case "chat.status": {

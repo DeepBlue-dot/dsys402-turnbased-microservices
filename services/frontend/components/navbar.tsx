@@ -18,7 +18,6 @@ export function Navbar() {
 
     const navItems = [
         { href: "/dashboard", label: "Hub" },
-        { href: "/history", label: "History" },
         { href: "/users", label: "Players" },
     ];
 
