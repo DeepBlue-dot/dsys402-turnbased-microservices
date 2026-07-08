@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { UserRound } from "lucide-react";
 import { cn, getAvatarUrl } from "@/lib/utils";
@@ -14,29 +15,13 @@ function initials(name: string) {
     .join("") || "?";
 }
 
-function formatStatus(status?: string) {
-  if (!status) return "Offline";
-  if (status === "IDLE") return "online";
-  return status.replaceAll("_", " ").toLowerCase();
-}
-
-function statusClasses(status?: string) {
-  if (status === "IN_GAME") return "border-primary/30 bg-primary/10 text-primary";
-  if (status === "IDLE") return "border-emerald-400/30 bg-emerald-400/10 text-emerald-300";
-  if (status === "QUEUED") return "border-amber-300/30 bg-amber-300/10 text-amber-200";
-  return "border-muted bg-muted/40 text-muted-foreground";
-}
-
 export function PlayerPanel({
   align = "left",
   label,
   name,
   playerId,
   rating,
-  record,
-  status,
   symbol,
-  supporting,
   avatarUrl,
 }: {
   align?: "left" | "right";
@@ -65,13 +50,16 @@ export function PlayerPanel({
           ) : playerId ? (
             <Link href={`/users/${playerId}`} className="relative w-full h-full block hover:text-primary transition-colors">
               {getAvatarUrl(avatarUrl) ? (
-                <img
-                  src={getAvatarUrl(avatarUrl) || undefined}
+                <Image
+                  src={getAvatarUrl(avatarUrl) || ""}
                   alt={`${name}'s avatar`}
-                  className="h-full w-full object-cover animate-in fade-in duration-200"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = "none";
-                    const sibling = (e.target as HTMLElement).nextElementSibling;
+                  fill
+                  sizes="44px"
+                  className="object-cover animate-in fade-in duration-200"
+                  onError={(event) => {
+                    const target = event.currentTarget as HTMLImageElement;
+                    target.style.display = "none";
+                    const sibling = target.nextElementSibling;
                     if (sibling) sibling.classList.remove("hidden");
                   }}
                 />
@@ -88,13 +76,16 @@ export function PlayerPanel({
           ) : (
             <div className="relative w-full h-full block">
               {getAvatarUrl(avatarUrl) ? (
-                <img
-                  src={getAvatarUrl(avatarUrl) || undefined}
+                <Image
+                  src={getAvatarUrl(avatarUrl) || ""}
                   alt={`${name}'s avatar`}
-                  className="h-full w-full object-cover animate-in fade-in duration-200"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = "none";
-                    const sibling = (e.target as HTMLElement).nextElementSibling;
+                  fill
+                  sizes="44px"
+                  className="object-cover animate-in fade-in duration-200"
+                  onError={(event) => {
+                    const target = event.currentTarget as HTMLImageElement;
+                    target.style.display = "none";
+                    const sibling = target.nextElementSibling;
                     if (sibling) sibling.classList.remove("hidden");
                   }}
                 />
@@ -126,13 +117,6 @@ export function PlayerPanel({
             "mt-2 flex flex-wrap gap-2",
             align === "right" && "justify-end",
           )}>
-            <span className={cn(
-              "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs capitalize",
-              statusClasses(status),
-            )}>
-              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-              {formatStatus(status)}
-            </span>
             <span className="rounded-md border border-border bg-muted/30 px-2 py-1 font-mono text-xs text-muted-foreground">
               {rating} Elo
             </span>
@@ -149,8 +133,6 @@ export function PlayerPanel({
         "mt-3 grid gap-1 text-xs text-muted-foreground",
         align === "right" && "justify-items-end",
       )}>
-        <span>{record}</span>
-        <span>{supporting}</span>
       </div>
     </div>
   );

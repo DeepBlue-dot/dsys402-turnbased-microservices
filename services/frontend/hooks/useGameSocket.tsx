@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useMemo, useEffect } from "react";
 import type { ReactNode } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameSocketController } from "@/lib/gameSocket";
 import type {
@@ -58,8 +59,27 @@ type GameSocketContextValue = {
 const GameSocketContext = createContext<GameSocketContextValue | null>(null);
 
 export function GameSocketProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const { user } = useAuth();
   const socketState = useGameSocketController(user?.id);
+
+  useEffect(() => {
+    const hasActiveMatch =
+      !!user?.id &&
+      !!socketState.liveGame &&
+      socketState.liveGame.status !== "ENDED" &&
+      socketState.liveStatus === "IN_GAME";
+
+    const shouldRedirectToDashboard =
+      hasActiveMatch &&
+      pathname !== "/dashboard" &&
+      !pathname.startsWith("/dashboard");
+
+    if (shouldRedirectToDashboard) {
+      router.replace("/dashboard");
+    }
+  }, [pathname, router, socketState.liveGame, socketState.liveStatus, user?.id]);
 
   const value = useMemo<GameSocketContextValue>(() => ({
     connect: socketState.connect,

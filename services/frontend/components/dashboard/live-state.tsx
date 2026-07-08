@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Activity,
   Compass,
   Cpu,
-  Loader2,
   LogOut,
   Play,
   Radio,
@@ -26,44 +23,28 @@ interface LiveStateProps {
   livePlayer: CurrentPlayerState;
   liveOpponentUsername: string;
   sync: () => void;
+  onFindMatch: () => Promise<void>;
   handleLeaveQueue: () => Promise<void>;
   logout: () => void;
 }
 
 export function LiveState({
-  connectionState,
   isConnected,
   livePlayer,
   liveOpponentUsername,
   sync,
+  onFindMatch,
   handleLeaveQueue,
   logout,
 }: LiveStateProps) {
   const router = useRouter();
-  const [elapsed, setElapsed] = useState(0);
 
   const status = livePlayer.status || "IDLE";
   const isQueued = status === "QUEUED";
   const inGame = status === "IN_GAME";
   const canResume = inGame && livePlayer.game;
 
-  useEffect(() => {
-    if (!livePlayer?.queue) {
-      setElapsed(0);
-      return;
-    }
-
-    const initialWait = livePlayer.queue.waitTimeSeconds || 0;
-    const start = Date.now() - initialWait * 1000;
-
-    setElapsed(initialWait);
-
-    const timer = setInterval(() => {
-      setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [livePlayer?.queue?.waitTimeSeconds, !livePlayer?.queue]);
+  const elapsed = livePlayer?.queue ? livePlayer.queue.waitTimeSeconds : 0;
 
   return (
     <div className="space-y-5">
@@ -116,7 +97,7 @@ export function LiveState({
 
               <Button
                 size="lg"
-                onClick={() => router.push("/matchmaking")}
+                onClick={() => void onFindMatch()}
                 className="relative overflow-hidden w-full max-w-sm rounded-xl py-6 font-black tracking-wider text-sm shadow-md shadow-primary/20 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98] bg-primary text-primary-foreground group"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-purple-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -189,7 +170,7 @@ export function LiveState({
       {/* Quick Start Mode Selector (Only shown if IDLE) */}
       {status === "IDLE" && (
         <div className="grid gap-3.5 sm:grid-cols-3">
-          <div className="rounded-xl border border-border/80 bg-card/20 p-3.5 backdrop-blur-xl flex flex-col justify-between hover:border-primary/20 transition-all duration-200 cursor-pointer" onClick={() => router.push("/matchmaking")}>
+          <div className="rounded-xl border border-border/80 bg-card/20 p-3.5 backdrop-blur-xl flex flex-col justify-between hover:border-primary/20 transition-all duration-200 cursor-pointer" onClick={() => void onFindMatch()}>
             <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mb-3">
               <Swords className="h-4 w-4" />
             </div>

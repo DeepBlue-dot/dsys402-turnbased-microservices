@@ -4,11 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   Clock3,
   Flag,
   Handshake,
-  Loader2,
   Radio,
   RefreshCcw,
   Swords,
@@ -59,7 +57,7 @@ function formatLastOnline(value?: string | null) {
   })}`;
 }
 
-export function GameView() {
+export function GameView({ onBackToHub }: { onBackToHub?: () => void }) {
   const router = useRouter();
   const { player, user } = useAuth();
   const {
@@ -253,6 +251,7 @@ export function GameView() {
   }
 
   function handleReturnToHub() {
+    onBackToHub?.();
     sync();
   }
 
@@ -300,7 +299,7 @@ export function GameView() {
               className="rounded-xl font-bold text-xs"
             >
               <Handshake className="h-4 w-4 mr-1.5" aria-hidden="true" />
-              Propose Draw
+              Draw
             </Button>
             <Button variant="outline" onClick={() => sync()} disabled={!isConnected} className="rounded-xl font-bold text-xs">
               <RefreshCcw className="h-4 w-4 mr-1.5" aria-hidden="true" />

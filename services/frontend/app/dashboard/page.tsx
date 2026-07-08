@@ -28,11 +28,13 @@ export default function DashboardPage() {
     liveStatus,
     liveQueue,
     liveGame,
+    gameOverState,
   } = useGameSocket(!!user);
   
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
   const [leaderboard, setLeaderboard] = useState<PlayerSearchItem[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"hub" | "game">("hub");
 
   const livePlayer = useMemo<CurrentPlayerState | null>(() => {
     if (!player) return null;
@@ -87,29 +89,61 @@ export default function DashboardPage() {
     }
   }, [loading, router, user]);
 
-
-
   useEffect(() => {
     if (isConnected) {
       void refreshUser();
     }
   }, [isConnected, refreshUser]);
 
-  useEffect(() => {
-    if (!user) return;
+  const refreshDashboardData = useMemo(() => {
+    return async () => {
+      if (!user) return;
 
-    // Load recent matches (limit to 10 for sparklines and history)
-    historyApi
-      .mine({ page: 1, limit: 10 })
-      .then((res) => setHistory(res.data))
-      .catch(() => setHistory([]));
+      try {
+        const [historyRes, leaderboardRes] = await Promise.all([
+          historyApi.mine({ page: 1, limit: 10 }),
+          playerApi.search({ page: 1, limit: 5 }),
+        ]);
 
-    // Load top 5 players for leaderboard peek
-    playerApi
-      .search({ page: 1, limit: 5 })
-      .then((res) => setLeaderboard(res.data))
-      .catch((err) => console.error("Failed to load leaderboard:", err));
+        setHistory(historyRes.data);
+        setLeaderboard(leaderboardRes.data);
+      } catch (err) {
+        console.error("Failed to refresh dashboard data:", err);
+        setHistory([]);
+        setLeaderboard([]);
+      }
+    };
   }, [user]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void refreshDashboardData();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [refreshDashboardData]);
+
+  useEffect(() => {
+    if (!gameOverState) return;
+
+    const timer = window.setTimeout(() => {
+      void refreshDashboardData();
+      void refreshUser();
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [gameOverState, refreshDashboardData, refreshUser]);
+
+  async function handleFindMatch() {
+    setActionError(null);
+    try {
+      await matchmakingApi.join();
+      await refreshUser();
+      sync();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Unable to start matchmaking.");
+    }
+  }
 
   async function handleLeaveQueue() {
     setActionError(null);
@@ -161,10 +195,13 @@ export default function DashboardPage() {
     );
   }
 
-  if (status === "IN_GAME") {
+  const hasLiveMatch = status === "IN_GAME" || (!!liveGame && liveGame.status !== "ENDED");
+  const shouldShowGameView = hasLiveMatch || (viewMode === "game" && !!gameOverState);
+
+  if (shouldShowGameView) {
     return (
       <div className="max-w-6xl mx-auto">
-        <GameView />
+        <GameView onBackToHub={() => setViewMode("hub")} />
       </div>
     );
   }
@@ -207,6 +244,7 @@ export default function DashboardPage() {
             livePlayer={livePlayer}
             liveOpponentUsername={liveOpponentUsername}
             sync={sync}
+            onFindMatch={handleFindMatch}
             handleLeaveQueue={handleLeaveQueue}
             logout={() => void logout()}
           />

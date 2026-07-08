@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Search, Trophy, Swords, ShieldAlert, User } from "lucide-react";
+import { Search, Trophy } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { playerApi } from "@/lib/api";
