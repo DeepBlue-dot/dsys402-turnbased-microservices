@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Providers } from "@/app/providers";
+import { BackgroundAnimation } from "@/components/ui/background-animation";
+import { BackgroundGrid } from "@/components/ui/background-grid";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,6 +21,8 @@ export default function RootLayout({
         className="min-h-screen bg-background text-foreground antialiased"
         suppressHydrationWarning
       >
+        <BackgroundAnimation />
+        <BackgroundGrid />
         <Providers>
           <Navbar />
           <main className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">

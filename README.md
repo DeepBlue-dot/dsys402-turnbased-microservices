@@ -3,6 +3,8 @@
 A production-grade, event-driven backend architecture for real-time and turn-based multiplayer games.
 Designed for scalability, fault tolerance, and clean domain separation.
 
+![Project Screenshot](docs/screencapture-localhost-3000-dashboard-2026-07-09-20_40_25.png)
+
 This system is suitable for games such as:
 
 * Tic-Tac-Toe / Chess / Checkers
