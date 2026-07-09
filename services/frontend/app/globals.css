@@ -86,12 +86,79 @@
   /* Keep aligned with root for consistency in this scoped theme */
 }
 
+html,
 body {
-  background:
-    radial-gradient(circle at 50% 0%, oklch(0.15 0.05 260), transparent 38rem),
-    linear-gradient(180deg, oklch(0.08 0.03 260), oklch(0.10 0.025 240));
+  margin: 0;
+  padding: 0;
+  background: #0d0c1d;
+  color: #ffffff;
+  overflow-x: hidden;
+  min-height: 100%;
+  font-family: "Segoe UI", sans-serif;
+}
+
+body {
+  position: relative;
   min-height: 100vh;
   font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+body::before {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(44, 102, 110, 0.9), transparent 26%),
+    radial-gradient(circle at 80% 12%, rgba(255, 105, 120, 0.32), transparent 24%),
+    radial-gradient(circle at 50% 100%, rgba(0, 255, 255, 0.16), transparent 28%),
+    linear-gradient(135deg, #161b33, #0d0c1d 60%, #2c666e),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 400% 400%, 72px 72px, 72px 72px;
+  animation: bg-animation 18s ease-in-out infinite alternate;
+  opacity: 0.95;
+}
+
+body::after {
+  left: 50%;
+  top: 50%;
+  width: 56vw;
+  height: 110vw;
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(circle closest-side, rgba(173, 245, 255, 0.9), transparent 60%),
+    radial-gradient(circle closest-side, rgba(255, 105, 120, 0.22), transparent 76%);
+  opacity: 0.7;
+  animation: glow-animation 6s ease-in-out infinite alternate;
+  filter: blur(22px);
+}
+
+@keyframes bg-animation {
+  0% {
+    background-position: 0% 0%, 0 0, 0 0;
+    transform: scale(1);
+  }
+  100% {
+    background-position: 400% 400%, 72px 72px, 72px 72px;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes glow-animation {
+  0% {
+    transform: translate(-50%, -50%) scale(0.62);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.06) rotate(90deg);
+    opacity: 0.9;
+  }
 }
 
 @layer base {

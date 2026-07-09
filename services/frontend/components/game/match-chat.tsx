@@ -36,22 +36,24 @@ export function MatchChat({
   onSendChat: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <div className="rounded-md border border-border bg-card p-4">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <div className="flex h-full flex-col rounded-2xl bg-transparent p-0">
+      <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-background/40 px-3 py-2">
         <div>
-          <h2 className="font-semibold">Match Chat</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-sm font-semibold">Match Chat</h2>
+          <p className="text-[11px] text-muted-foreground">
             {opponentId
               ? `To ${opponentLabel} (${formatStatus(opponentStatus)})`
               : "Waiting for opponent"}
           </p>
         </div>
-        <MessageSquare className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        <div className="rounded-full border border-border/70 bg-muted/40 p-2">
+          <MessageSquare className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        </div>
       </div>
 
-      <div className="mb-3 flex max-h-52 min-h-28 flex-col gap-2 overflow-y-auto rounded-md border border-border bg-muted/20 p-3">
+      <div className="mb-3 flex max-h-[22rem] min-h-[24rem] flex-1 flex-col gap-2 overflow-y-auto rounded-xl bg-background/30 p-2.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40">
         {chat.length === 0 ? (
-          <p className="m-auto text-center text-sm text-muted-foreground">
+          <p className="m-auto px-3 text-center text-xs text-muted-foreground">
             No messages yet.
           </p>
         ) : (
@@ -59,30 +61,32 @@ export function MatchChat({
             <div
               key={item.id}
               className={cn(
-                "max-w-[85%] rounded-md border px-3 py-2 text-sm",
+                "max-w-[88%] rounded-xl border px-2.5 py-2 text-sm shadow-sm",
                 item.from === "me" && "ml-auto border-primary/30 bg-primary/10",
-                item.from === "opponent" && "mr-auto border-border bg-card",
+                item.from === "opponent" && "mr-auto border-border/70 bg-card/80",
                 item.from === "system" && "mx-auto border-muted bg-muted/40 text-muted-foreground",
               )}
             >
-              <p>{item.text}</p>
-              <p className="mt-1 font-mono text-[10px] uppercase text-muted-foreground">
+              <p className="text-[13px] leading-5">{item.text}</p>
+              <p className="mt-1 flex items-center gap-1 font-mono text-[10px] uppercase text-muted-foreground">
                 {item.from === "me" ? (
-                  <Link href={`/users/${userId}`} className="hover:underline hover:text-primary transition-colors">You</Link>
+                  <Link href={`/users/${userId}`} className="transition-colors hover:text-primary hover:underline">You</Link>
                 ) : item.from === "opponent" && opponentId ? (
-                  <Link href={`/users/${opponentId}`} className="hover:underline hover:text-primary transition-colors">{opponentLabel}</Link>
-                ) : (
-                  "System"
-                )} · {item.at}
-                {item.status === "pending" ? " · sending" : ""}
-                {item.status === "failed" ? " · failed" : ""}
+                  <Link href={`/users/${opponentId}`} className="transition-colors hover:text-primary hover:underline">{opponentLabel}</Link>
+                ) : null}
+                <span>· {item.at}</span>
+                {item.from === "me" && (
+                  <span className="ml-1 text-[11px] text-primary">
+                    {item.status === "pending" ? "✓" : item.status === "failed" ? "✕" : "✓✓"}
+                  </span>
+                )}
               </p>
             </div>
           ))
         )}
       </div>
 
-      <form className="flex gap-2" onSubmit={onSendChat}>
+      <form className="mt-auto flex items-center gap-2 rounded-xl bg-background/40 p-2" onSubmit={onSendChat}>
         <Input
           aria-label="Match chat message"
           value={chatText}
@@ -90,8 +94,9 @@ export function MatchChat({
           placeholder={canChat ? "Message opponent..." : "Chat unavailable"}
           maxLength={240}
           disabled={!canChat}
+          className="h-9 rounded-xl border-border/70 bg-background/70 text-sm"
         />
-        <Button type="submit" size="sm" disabled={!canChat || !chatText.trim()}>
+        <Button type="submit" size="sm" disabled={!canChat || !chatText.trim()} className="h-9 rounded-xl px-3">
           <Send className="h-4 w-4" aria-hidden="true" />
           <span className="sr-only">Send</span>
         </Button>

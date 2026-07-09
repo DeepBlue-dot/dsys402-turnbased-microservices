@@ -416,14 +416,8 @@ export function useGameSocketController(userId?: string): GameSocketControllerVa
         case "chat.status": {
           const isFailed = message.status === "FAILED";
           const reasonFormatted = message.reason ? message.reason.replace(/_/g, " ").toLowerCase() : "";
-          addChatItem(
-            "system",
-            isFailed
-              ? `Message failed${reasonFormatted ? `: ${reasonFormatted}` : "."}`
-              : "Message delivered.",
-            isFailed ? "failed" : "sent",
-          );
           if (isFailed) {
+            addChatItem("system", `Message failed${reasonFormatted ? `: ${reasonFormatted}` : "."}`, "failed");
             setNotice(reasonFormatted ? `Chat failed: ${reasonFormatted}.` : "Chat message failed.");
           }
           break;

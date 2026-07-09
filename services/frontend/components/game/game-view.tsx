@@ -81,6 +81,7 @@ export function GameView({ onBackToHub }: { onBackToHub?: () => void }) {
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [chatText, setChatText] = useState("");
+  const [activityTab, setActivityTab] = useState<"chat" | "feed">("chat");
   const [opponentInfo, setOpponentInfo] = useState<PublicPlayerInfo | null>(null);
   
   const opponentId = game?.opponentId ||
@@ -261,9 +262,7 @@ export function GameView({ onBackToHub }: { onBackToHub?: () => void }) {
                 Match {game ? shortId(game.matchId) : "None"}
               </span>
             </div>
-            <div className="pt-1">
-              <h1 className="text-3xl font-bold font-black tracking-tight">Tic Tac Toe</h1>
-            </div>
+
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -379,19 +378,50 @@ export function GameView({ onBackToHub }: { onBackToHub?: () => void }) {
       </section>
 
       <aside className="flex min-w-0 flex-col gap-4 lg:justify-center">
-        <MatchChat
-          chat={chat}
-          chatText={chatText}
-          setChatText={setChatText}
-          canChat={canChat}
-          opponentLabel={opponentLabel}
-          opponentStatus={opponentStatus}
-          opponentId={opponentId}
-          userId={user?.id}
-          onSendChat={sendChat}
-        />
+        <div className="flex min-h-[34rem] flex-col rounded-2xl border border-border/20 bg-card/40 p-2.5 shadow-sm backdrop-blur-xl lg:min-w-[380px]">
+          <div className="mb-3 flex items-center gap-2 rounded-xl border border-border/70 bg-muted/35 p-1">
+            <button
+              type="button"
+              onClick={() => setActivityTab("chat")}
+              className={cn(
+                "flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                activityTab === "chat"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
+              )}
+            >
+              Match Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivityTab("feed")}
+              className={cn(
+                "flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                activityTab === "feed"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
+              )}
+            >
+              Live Feed
+            </button>
+          </div>
 
-        <LiveFeed feed={feed} />
+          {activityTab === "chat" ? (
+            <MatchChat
+              chat={chat}
+              chatText={chatText}
+              setChatText={setChatText}
+              canChat={canChat}
+              opponentLabel={opponentLabel}
+              opponentStatus={opponentStatus}
+              opponentId={opponentId}
+              userId={user?.id}
+              onSendChat={sendChat}
+            />
+          ) : (
+            <LiveFeed feed={feed} />
+          )}
+        </div>
       </aside>
 
       {(!game || gameOver) && (
